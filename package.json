@@ -1,0 +1,7 @@
+{
+  "name": "student-os-ai",
+  "scripts": {
+    "dev": "echo Ready",
+    "start": "echo Start"
+  }
+}
