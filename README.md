@@ -61,3 +61,17 @@ AI:
 ## Trạng thái
 
 Planning — Week 1
+
+## Roadmap
+
+Week 1
+Planning
+
+Week 2
+UI/UX
+
+Week 3
+Frontend
+
+Week 4
+Backend
