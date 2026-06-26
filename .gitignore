@@ -1,27 +1,70 @@
-# Node
-node_modules
-dist
+# =========================
+# Node / Frontend
+# =========================
 
-# Python
-venv
-__pycache__
-*.pyc
+node_modules/
+dist/
+build/
+.next/
+out/
 
-# Env
+# Package manager
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# =========================
+# Python / Backend
+# =========================
+
+venv/
+.venv/
+
+__pycache__/
+*.py[cod]
+*.pyo
+
+.pytest_cache/
+
+# Environment
 .env
 .env.local
+.env.*
 
+# =========================
+# Database
+# =========================
+
+*.sqlite
+*.db
+
+# =========================
+# IDE
+# =========================
+
+.vscode/
+!.vscode/extensions.json
+
+.idea/
+
+# =========================
 # OS
+# =========================
+
 .DS_Store
 Thumbs.db
 
-# Logs
-logs
-*.log
+# =========================
+# Temporary
+# =========================
 
-# Build
-build
-coverage
-
-# IDE
-.vscode/settings.json
+tmp/
+temp/
+.cache/
