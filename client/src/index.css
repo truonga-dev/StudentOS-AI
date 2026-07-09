@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   GLOBAL CSS VARIABLES — Design System
+   ============================================ */
+@layer base {
+  :root {
+    --color-primary: 107 78 255;
+    --sidebar-width: 256px;
+    --sidebar-collapsed-width: 72px;
+    --topbar-height: 64px;
+  }
+
+  /* Base reset */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  body {
+    @apply bg-surface-50 dark:bg-surface-950 text-surface-900 dark:text-surface-100 font-sans antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-300 dark:bg-surface-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-400 dark:bg-surface-500;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    outline: 2px solid rgb(107 78 255 / 0.7);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* ============================================
+   COMPONENT LAYER — Reusable utilities
+   ============================================ */
+@layer components {
+
+  /* Card */
+  .card {
+    @apply bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-card;
+  }
+  .card-hover {
+    @apply bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-card
+           hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200;
+  }
+
+  /* Sidebar item */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-600 dark:text-surface-400
+           hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-600 dark:hover:text-primary-400
+           transition-all duration-150 cursor-pointer select-none text-sm font-medium;
+  }
+  .sidebar-item.active {
+    @apply bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 font-semibold;
+  }
+
+  /* Badge base — defined without @apply chain to avoid circular issues */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 0.875rem;
+  }
+  .badge-primary {
+    @apply bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300;
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.625rem; font-weight: 600;
+  }
+  .badge-success {
+    @apply bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400;
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.625rem; font-weight: 600;
+  }
+  .badge-warning {
+    @apply bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400;
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.625rem; font-weight: 600;
+  }
+  .badge-danger {
+    @apply bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400;
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.625rem; font-weight: 600;
+  }
+  .badge-neutral {
+    @apply bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300;
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.625rem; font-weight: 600;
+  }
+
+  /* Section headings */
+  .section-title {
+    @apply text-lg font-semibold text-surface-900 dark:text-surface-100;
+  }
+  .section-subtitle {
+    @apply text-sm text-surface-500 dark:text-surface-400;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-surface-200 dark:border-surface-600
+           bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100
+           text-sm placeholder:text-surface-400
+           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500
+           transition-all duration-150;
+  }
+
+  /* Progress */
+  .progress-bar {
+    @apply h-2 rounded-full bg-surface-100 dark:bg-surface-700 overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    @apply animate-pulse bg-surface-200 dark:bg-surface-700 rounded-lg;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] rounded-xl font-medium transition-all duration-200 select-none cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white shadow-sm hover:shadow;
+  }
+  .btn-secondary {
+    @apply bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-900 dark:text-white;
+  }
+  .btn-outline {
+    @apply border border-surface-200 dark:border-surface-700 hover:border-primary-500 dark:hover:border-primary-500 bg-transparent text-surface-700 dark:text-surface-300 hover:text-primary-600 dark:hover:text-primary-400;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-700 dark:text-surface-300;
+  }
+}
+
+/* ============================================
+   UTILITY LAYER
+   ============================================ */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  .bg-gradient-brand {
+    @apply bg-gradient-to-br from-primary-500 to-accent-600;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-white/70 dark:bg-surface-800/70 backdrop-blur-md border border-white/20 dark:border-surface-700/50;
+  }
+
+  /* Scrollable container */
+  .scrollable {
+    @apply overflow-y-auto overflow-x-hidden;
+    scrollbar-gutter: stable;
+  }
+
+  /* Line clamp */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* 3D Flip Utilities */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
