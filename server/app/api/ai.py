@@ -4,7 +4,8 @@ from typing import Optional, List, Dict
 from pydantic import BaseModel
 from app.core.config import settings
 from app.core.auth import get_user_id
-from app.core.supabase_client import get_supabase
+from app.core.supabase_client import get_supabase, get_user_supabase
+from supabase import Client
 import google.generativeai as genai
 try:
     from groq import Groq
@@ -554,7 +555,8 @@ class GenerateFlashcardsFromDocumentRequest(BaseModel):
 @router.post("/generate-flashcards-from-document")
 async def generate_flashcards_from_document(
     req: GenerateFlashcardsFromDocumentRequest,
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """
     Tạo flashcards từ tài liệu đã upload (qua document_chunks).
@@ -564,8 +566,6 @@ async def generate_flashcards_from_document(
 
     if not req.file_names:
         raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất một tài liệu")
-
-    sb = get_supabase()
     
     # Query all chunks for these files and this user
     res = sb.table("document_chunks").select("content").eq("user_id", user_id).in_("file_name", req.file_names).execute()
@@ -620,12 +620,11 @@ class WeeklyReportRequest(BaseModel):
 @router.post("/generate-weekly-report")
 async def generate_weekly_report(
     req: WeeklyReportRequest,
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     if not model:
         raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-
-    sb = get_supabase()
     
     # Lấy tasks tuần qua
     res_tasks = sb.table("tasks").select("title, completed, due_date").eq("user_id", user_id).gte("due_date", req.week_start).lte("due_date", req.week_end).execute()
@@ -646,7 +645,8 @@ async def generate_weekly_report(
     - Công việc đã hoàn thành: {len(completed_tasks)}
     - Công việc chưa hoàn thành: {len(pending_tasks)}
     
-    Trả về định dạng HTML đẹp mắt để hiển thị trực tiếp trên web (sử dụng Tailwind classes hoặc inline CSS cơ bản cũng được, nhưng tốt nhất là dùng các thẻ <h1>, <p>, <ul>, <ol>, <li> cơ bản, bôi đậm những điểm chính). Trả về CHỈ HTML, không chứa markdown bao bọc (như ```html).
+    Trả về định dạng HTML cơ bản (chỉ dùng các thẻ <b>, <i>, <p>, <ul>, <li>, <br>).
+    TUYỆT ĐỐI KHÔNG DÙNG thuộc tính style hay bất kỳ class CSS/Tailwind nào (như bg-white, text-black, v.v.) để tránh lỗi hiển thị trong Dark Mode. Trả về CHỈ HTML, không chứa thẻ markdown bao bọc.
     """
 
     try:
@@ -673,8 +673,7 @@ async def generate_weekly_report(
         raise HTTPException(status_code=500, detail=f"Lỗi tạo báo cáo: {str(e)}")
 
 @router.get("/weekly-reports")
-async def get_weekly_reports(user_id: str = Depends(get_user_id)):
-    sb = get_supabase()
+async def get_weekly_reports(user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     res = sb.table("ai_reports").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
     return res.data
 

@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.auth import get_user_id
-from app.core.supabase_client import get_supabase
+from app.core.supabase_client import get_supabase, get_user_supabase
+from supabase import Client
 from app.schemas.schemas import TaskCreate, TaskOut, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -11,9 +12,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 async def list_tasks(
     completed: bool | None = Query(default=None, description="Lọc theo trạng thái"),
     user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """Lấy danh sách tasks. Tùy chọn lọc theo completed."""
-    sb = get_supabase()
     query = sb.table("tasks").select("*, subjects(title, color)").eq("user_id", user_id)
     if completed is not None:
         query = query.eq("completed", completed)
@@ -25,9 +26,9 @@ async def list_tasks(
 async def upcoming_tasks(
     limit: int = Query(default=5, ge=1, le=20),
     user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """Tasks sắp tới: chưa hoàn thành, có due_date, limit N."""
-    sb = get_supabase()
     res = (
         sb.table("tasks")
         .select("*, subjects(title, color)")
@@ -43,9 +44,8 @@ async def upcoming_tasks(
 
 
 @router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-async def create_task(body: TaskCreate, user_id: str = Depends(get_user_id)):
+async def create_task(body: TaskCreate, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """Tạo task mới."""
-    sb = get_supabase()
     payload = body.model_dump(mode="json")
     payload["user_id"] = user_id
     res = sb.table("tasks").insert(payload).select("*, subjects(title, color)").execute()
@@ -59,9 +59,9 @@ async def update_task(
     task_id: str,
     body: TaskUpdate,
     user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """Cập nhật task (bao gồm toggle completed)."""
-    sb = get_supabase()
     data = body.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status_code=400, detail="Không có dữ liệu cập nhật")
@@ -79,7 +79,6 @@ async def update_task(
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(task_id: str, user_id: str = Depends(get_user_id)):
+async def delete_task(task_id: str, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """Xóa task."""
-    sb = get_supabase()
     sb.table("tasks").delete().eq("id", task_id).eq("user_id", user_id).execute()

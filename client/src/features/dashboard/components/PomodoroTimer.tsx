@@ -12,352 +12,327 @@ type TimerMode = 'idle' | 'focus' | 'paused' | 'break' | 'done'
 const FOCUS_MINUTES = 25
 const BREAK_MINUTES = 5
 
-// ── SVG Ring Progress ──────────────────────────────────────────────────────────
+const ACCENT_MAP: Record<TimerMode, string> = {
+  idle:   '#6B4EFF',
+  focus:  '#6B4EFF',
+  paused: '#f59e0b',
+  break:  '#22c55e',
+  done:   '#a855f7',
+}
+
 function RingProgress({ progress, mode }: { progress: number; mode: TimerMode }) {
-  const r = 52
-  const circumference = 2 * Math.PI * r
-  const strokeDash = circumference * (1 - progress)
-
-  const ringColor =
-    mode === 'break' ? '#22c55e' :
-    mode === 'done'  ? '#6B4EFF' :
-    mode === 'paused'? '#f59e0b' : '#6B4EFF'
-
+  const r    = 54
+  const circ = 2 * Math.PI * r
+  const dash = circ * (1 - progress)
+  const color = ACCENT_MAP[mode]
   return (
-    <svg width="140" height="140" viewBox="0 0 140 140" className="absolute inset-0">
+    <svg width="144" height="144" viewBox="0 0 144 144" className="absolute inset-0">
       {/* Track */}
-      <circle cx="70" cy="70" r={r} fill="none" stroke="currentColor"
-        className="text-surface-100 dark:text-surface-800" strokeWidth="8" />
-      {/* Progress */}
-      <circle
-        cx="70" cy="70" r={r} fill="none"
-        stroke={ringColor} strokeWidth="8"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDash}
-        transform="rotate(-90 70 70)"
-        style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
+      <circle cx="72" cy="72" r={r} fill="none" strokeWidth="8"
+        stroke="currentColor" className="text-surface-100 dark:text-surface-800/60" />
+      {/* Glow (dark mode) */}
+      <circle cx="72" cy="72" r={r} fill="none" strokeWidth="10"
+        stroke={color} strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={dash}
+        transform="rotate(-90 72 72)" opacity="0.2"
+        style={{ filter: 'blur(4px)', transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
+      />
+      {/* Main ring */}
+      <circle cx="72" cy="72" r={r} fill="none" strokeWidth="8"
+        stroke={color} strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={dash}
+        transform="rotate(-90 72 72)"
+        style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
       />
     </svg>
   )
 }
 
-// ── Pomodoro Timer ─────────────────────────────────────────────────────────────
 export function PomodoroTimer({ onSessionLogged }: { onSessionLogged?: () => void }) {
   const navigate = useNavigate()
   const { subjects } = useSubjects()
   const { logSession } = useStudySessions()
   const { addPoints, addXp } = useProfile()
 
-  const [mode, setMode] = useState<TimerMode>('idle')
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_MINUTES * 60)
+  const [mode, setMode]                     = useState<TimerMode>('idle')
+  const [secondsLeft, setSecondsLeft]       = useState(FOCUS_MINUTES * 60)
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [sessionStarted, setSessionStarted] = useState<Date | null>(null)
-  const [expanded, setExpanded] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [pomoCount, setPomoCount] = useState(0) // số pomodoro hoàn thành hôm nay
+  const [expanded, setExpanded]             = useState(false)
+  const [isFullscreen, setIsFullscreen]     = useState(false)
+  const [pomoCount, setPomoCount]           = useState(0)
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const totalSeconds = mode === 'break' ? BREAK_MINUTES * 60 : FOCUS_MINUTES * 60
-  const progress = secondsLeft / totalSeconds
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
-  const ss = String(secondsLeft % 60).padStart(2, '0')
+  const progress     = secondsLeft / totalSeconds
+  const mm           = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
+  const ss           = String(secondsLeft % 60).padStart(2, '0')
+  const accent       = ACCENT_MAP[mode]
 
-  // Âm thanh khi hết giờ (Web Audio API)
   const playDing = useCallback(() => {
     try {
       const ctx = new AudioContext()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(880, ctx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5)
-      gain.gain.setValueAtTime(0.5, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1)
-      osc.start()
-      osc.stop(ctx.currentTime + 1)
-    } catch {
-      // AudioContext không available → bỏ qua
-    }
+      ;[[523, 0, 0.5], [659, 0.25, 0.5], [784, 0.5, 0.7]].forEach(([f, t, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain()
+        o.connect(g); g.connect(ctx.destination)
+        o.type = 'sine'; o.frequency.value = f
+        g.gain.setValueAtTime(0, ctx.currentTime + t)
+        g.gain.linearRampToValueAtTime(0.3, ctx.currentTime + t + 0.05)
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d)
+        o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d)
+      })
+    } catch {}
   }, [])
 
-  // Clear interval khi unmount
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current) }, [])
 
   const tick = useCallback(() => {
-    setSecondsLeft(prev => {
-      if (prev <= 1) {
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        return 0
-      }
-      return prev - 1
-    })
+    setSecondsLeft(p => { if (p <= 1) { clearInterval(intervalRef.current!); return 0 } return p - 1 })
   }, [])
 
-  // Khi secondsLeft = 0: xử lý kết thúc
   useEffect(() => {
-    if (secondsLeft === 0 && (mode === 'focus' || mode === 'break')) {
-      playDing()
-      if (mode === 'focus') {
-        // Log session vào DB
-        const started = sessionStarted ?? new Date(Date.now() - FOCUS_MINUTES * 60 * 1000)
-        logSession({
-          subject_id: selectedSubjectId,
-          duration_minutes: FOCUS_MINUTES,
-          started_at: started.toISOString(),
-          ended_at: new Date().toISOString(),
-        }).then(() => onSessionLogged?.())
-        
-        // Cộng 10 điểm (streak) và 25 XP
-        addPoints(10)
-        addXp(25)
-        toast.success('+25 XP! Bạn đã hoàn thành 1 Pomodoro!', { icon: '🔥' })
-
-        setPomoCount(c => c + 1)
-        setMode('done')
-      } else {
-        // Break xong → về idle
-        setMode('idle')
-        setSecondsLeft(FOCUS_MINUTES * 60)
-      }
+    if (secondsLeft !== 0 || (mode !== 'focus' && mode !== 'break')) return
+    playDing()
+    if (mode === 'focus') {
+      const started = sessionStarted ?? new Date(Date.now() - FOCUS_MINUTES * 60 * 1000)
+      logSession({ subject_id: selectedSubjectId, duration_minutes: FOCUS_MINUTES, started_at: started.toISOString(), ended_at: new Date().toISOString() })
+        .then(() => onSessionLogged?.())
+      addPoints(10); addXp(25)
+      toast.success('🔥 +25 XP! Hoàn thành 1 Pomodoro!', { icon: '🍅' })
+      setPomoCount(c => c + 1); setMode('done')
+    } else {
+      setMode('idle'); setSecondsLeft(FOCUS_MINUTES * 60)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsLeft])
+  }, [secondsLeft]) // eslint-disable-line
 
-  const start = () => {
-    setMode('focus')
-    setSessionStarted(new Date())
-    intervalRef.current = setInterval(tick, 1000)
-    setExpanded(true)
-  }
+  const start = () => { setMode('focus'); setSessionStarted(new Date()); intervalRef.current = setInterval(tick, 1000); setExpanded(true) }
+  const pause = () => { setMode('paused'); clearInterval(intervalRef.current!) }
+  const resume = () => { setMode('focus'); intervalRef.current = setInterval(tick, 1000) }
+  const reset  = () => { clearInterval(intervalRef.current!); setMode('idle'); setSecondsLeft(FOCUS_MINUTES * 60); setSessionStarted(null) }
+  const startBreak = () => { setMode('break'); setSecondsLeft(BREAK_MINUTES * 60); intervalRef.current = setInterval(tick, 1000) }
+  const skipBreak  = () => { clearInterval(intervalRef.current!); setMode('idle'); setSecondsLeft(FOCUS_MINUTES * 60) }
 
-  const pause = () => {
-    setMode('paused')
-    if (intervalRef.current) clearInterval(intervalRef.current)
-  }
+  const modeLabel = { idle: 'Sẵn sàng', focus: 'Đang học', paused: 'Tạm dừng', break: 'Nghỉ giải lao', done: 'Hoàn thành! 🎉' }[mode]
 
-  const resume = () => {
-    setMode('focus')
-    intervalRef.current = setInterval(tick, 1000)
-  }
-
-  const reset = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    setMode('idle')
-    setSecondsLeft(FOCUS_MINUTES * 60)
-    setSessionStarted(null)
-  }
-
-  const startBreak = () => {
-    setMode('break')
-    setSecondsLeft(BREAK_MINUTES * 60)
-    intervalRef.current = setInterval(tick, 1000)
-  }
-
-  const skipBreak = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    setMode('idle')
-    setSecondsLeft(FOCUS_MINUTES * 60)
-  }
-
-  const modeLabel = {
-    idle: 'Sẵn sàng',
-    focus: 'Đang học',
-    paused: 'Tạm dừng',
-    break: 'Nghỉ giải lao',
-    done: 'Hoàn thành! 🎉',
-  }[mode]
-
-  const modeColor = {
-    idle:   'text-surface-500 dark:text-surface-400',
-    focus:  'text-primary-600 dark:text-primary-400',
-    paused: 'text-warning-600 dark:text-warning-400',
-    break:  'text-success-600 dark:text-success-400',
-    done:   'text-primary-600 dark:text-primary-400',
-  }[mode]
-
-  // ── Collapsed (mini) ──
+  // ── Collapsed (mini) ──────────────────────────────────────────────────────
   if (!expanded) {
     return (
       <button
         onClick={() => setExpanded(true)}
-        className="card p-4 flex items-center gap-4 hover:shadow-card-hover transition-all cursor-pointer w-full"
+        className="card p-4 flex items-center gap-3.5 hover:shadow-card-hover transition-all cursor-pointer w-full group"
       >
+        {/* Ring mini */}
         <div className="relative w-11 h-11 shrink-0">
-          <div className="w-11 h-11 rounded-full bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center">
-            <span className="text-lg">🍅</span>
+          <svg width="44" height="44" viewBox="0 0 44 44" className="absolute inset-0">
+            <circle cx="22" cy="22" r="18" fill="none" strokeWidth="4"
+              stroke="currentColor" className="text-surface-100 dark:text-surface-800" />
+            <circle cx="22" cy="22" r="18" fill="none" strokeWidth="4"
+              stroke={accent} strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 18}
+              strokeDashoffset={2 * Math.PI * 18 * (1 - progress)}
+              transform="rotate(-90 22 22)"
+              style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-lg leading-none">{mode === 'done' ? '🏆' : '🍅'}</span>
           </div>
         </div>
+
         <div className="text-left flex-1 min-w-0">
-          <p className="text-sm font-semibold text-surface-800 dark:text-surface-200">Pomodoro Timer</p>
-          <p className="text-xs text-surface-400">{pomoCount > 0 ? `${pomoCount} pomodoro hôm nay` : 'Bấm để bắt đầu học'}</p>
+          <p className="text-sm font-bold text-surface-800 dark:text-surface-100">Pomodoro Timer</p>
+          <p className="text-xs text-surface-400 truncate">
+            {pomoCount > 0 ? `🔥 ${pomoCount} pomo hôm nay` : 'Nhấn để bắt đầu'}
+          </p>
         </div>
-        <span className={clsx('text-sm font-mono font-bold', modeColor)}>{mm}:{ss}</span>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-mono font-bold tabular-nums" style={{ color: accent }}>{mm}:{ss}</span>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center transition-all"
+            style={{ background: `${accent}18` }}>
+            <Play className="w-3 h-3 ml-0.5" style={{ color: accent }} />
+          </div>
+        </div>
       </button>
     )
   }
 
-  // ── Expanded ──
+  // ── Expanded ──────────────────────────────────────────────────────────────
   return (
     <div className={clsx(
-      "transition-all duration-300",
-      isFullscreen 
-        ? "fixed inset-0 z-[100] bg-white dark:bg-surface-900 flex flex-col items-center justify-center p-8" 
-        : "card p-5 space-y-4"
-    )}>
+      'transition-all duration-300 overflow-hidden',
+      isFullscreen
+        ? 'fixed inset-0 z-[100] flex items-center justify-center'
+        : 'card'
+    )}
+      style={isFullscreen ? {
+        background: 'linear-gradient(135deg, #0a0a1a 0%, #0d0b1e 50%, #0a1020 100%)'
+      } : {}}>
+
       <div className={clsx(
-        "w-full max-w-md mx-auto transition-all duration-300 flex flex-col",
-        isFullscreen ? "scale-125 gap-8" : "gap-4"
+        'w-full max-w-sm mx-auto flex flex-col',
+        isFullscreen ? 'gap-6 scale-125' : 'gap-4 p-5'
       )}>
+
         {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🍅</span>
-          <h3 className="section-title text-sm">Pomodoro</h3>
-          {pomoCount > 0 && !isFullscreen && (
-            <span className="badge-neutral text-2xs">×{pomoCount} hôm nay</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => navigate('/focus')}
-            className="w-8 h-8 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 flex items-center justify-center text-surface-400 hover:text-primary-500 transition-colors"
-            title="Mở Focus Space (Toàn màn hình)"
-          >
-            <Headphones className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="w-8 h-8 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 flex items-center justify-center text-surface-400 hover:text-surface-600 transition-colors"
-            title={isFullscreen ? "Thu nhỏ" : "Phóng to"}
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-          {!isFullscreen && (
-            <button
-              onClick={() => setExpanded(false)}
-              className="w-8 h-8 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 flex items-center justify-center text-surface-400 hover:text-surface-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+              style={{ background: `${accent}20` }}>🍅</div>
+            <h3 className={clsx('font-bold text-sm', isFullscreen ? 'text-white' : 'text-surface-800 dark:text-surface-100')}>
+              Pomodoro
+            </h3>
+            {pomoCount > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: `${accent}20`, color: accent }}>
+                ×{pomoCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate('/focus')}
+              className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                isFullscreen ? 'text-white/50 hover:bg-white/10 hover:text-white' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 hover:text-primary-500')}
+              title="Mở Focus Space">
+              <Headphones className="w-4 h-4" />
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Subject picker — chỉ khi idle */}
-      {mode === 'idle' && (
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-surface-500 dark:text-surface-400 flex items-center gap-1.5">
-            <BookOpen className="w-3.5 h-3.5" />Môn học
-          </label>
-          <select
-            className="input text-sm py-2"
-            value={selectedSubjectId ?? ''}
-            onChange={e => setSelectedSubjectId(e.target.value || null)}
-          >
-            <option value="">Tổng hợp (không chọn môn)</option>
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.title}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Timer ring */}
-      <div className="flex flex-col items-center gap-3 py-2">
-        <div className="relative w-[140px] h-[140px] flex items-center justify-center">
-          <RingProgress progress={progress} mode={mode} />
-          <div className="text-center z-10">
-            <p className={clsx('text-3xl font-bold font-mono tracking-tight', modeColor)}>
-              {mm}:{ss}
-            </p>
-            <p className={clsx('text-xs font-medium mt-0.5', modeColor)}>{modeLabel}</p>
+            <button onClick={() => setIsFullscreen(f => !f)}
+              className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                isFullscreen ? 'text-white/50 hover:bg-white/10 hover:text-white' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 hover:text-surface-600')}>
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            {!isFullscreen && (
+              <button onClick={() => setExpanded(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 hover:text-surface-600 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          {mode === 'idle' && (
-            <button
-              onClick={start}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-brand text-white text-sm font-semibold shadow-glow-sm hover:shadow-glow hover:opacity-90 transition-all"
-            >
-              <Play className="w-4 h-4 fill-white" />Bắt đầu
-            </button>
+        {/* Subject picker */}
+        {mode === 'idle' && (
+          <div className="space-y-1.5">
+            <label className={clsx('text-xs font-medium flex items-center gap-1.5',
+              isFullscreen ? 'text-white/50' : 'text-surface-500 dark:text-surface-400')}>
+              <BookOpen className="w-3.5 h-3.5" />Môn học
+            </label>
+            <select
+              className={clsx('w-full text-sm py-2.5 px-3 rounded-xl outline-none border transition-all appearance-none cursor-pointer',
+                isFullscreen
+                  ? 'bg-white/8 border-white/15 text-white focus:border-white/30'
+                  : 'input'
+              )}
+              style={isFullscreen ? { colorScheme: 'dark' } : {}}
+              value={selectedSubjectId ?? ''}
+              onChange={e => setSelectedSubjectId(e.target.value || null)}>
+              <option value="">Tổng hợp (không chọn môn)</option>
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Timer ring */}
+        <div className="flex flex-col items-center gap-3 py-2">
+          <div className="relative w-[144px] h-[144px] flex items-center justify-center">
+            <RingProgress progress={progress} mode={mode} />
+            <div className="text-center z-10">
+              <p className={clsx('text-3xl font-black font-mono tracking-tight tabular-nums transition-colors duration-400',
+                isFullscreen ? 'text-white' : '')}
+                style={{ color: isFullscreen ? '#fff' : accent, textShadow: isFullscreen ? `0 0 30px ${accent}60` : 'none' }}>
+                {mm}:{ss}
+              </p>
+              <p className="text-xs font-semibold mt-1 transition-colors duration-400" style={{ color: isFullscreen ? `${accent}bb` : accent }}>
+                {modeLabel}
+              </p>
+            </div>
+          </div>
+
+          {/* Mode dots (pomo count) */}
+          {pomoCount > 0 && (
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(pomoCount, 6) }).map((_, i) => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
+              ))}
+              {pomoCount > 6 && <span className="text-[10px] text-surface-400 ml-0.5">+{pomoCount - 6}</span>}
+            </div>
           )}
 
-          {mode === 'focus' && (
-            <>
-              <button
-                onClick={pause}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-warning-50 dark:bg-warning-500/10 text-warning-600 dark:text-warning-400 text-sm font-medium hover:bg-warning-100 dark:hover:bg-warning-500/20 transition-colors"
-              >
-                <Pause className="w-4 h-4" />Tạm dừng
+          {/* Controls */}
+          <div className="flex items-center gap-2.5">
+            {mode === 'idle' && (
+              <button onClick={start}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-2xl text-white text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: `linear-gradient(135deg, ${accent}, ${accent}cc)`,
+                  boxShadow: `0 4px 20px ${accent}40`
+                }}>
+                <Play className="w-4 h-4 fill-white" />Bắt đầu
               </button>
-              <button
-                onClick={reset}
-                className="w-9 h-9 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-700 flex items-center justify-center text-surface-400 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </>
-          )}
+            )}
 
-          {mode === 'paused' && (
-            <>
-              <button
-                onClick={resume}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
-              >
-                <Play className="w-4 h-4" />Tiếp tục
-              </button>
-              <button
-                onClick={reset}
-                className="w-9 h-9 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-700 flex items-center justify-center text-surface-400 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </>
-          )}
+            {mode === 'focus' && (
+              <>
+                <button onClick={pause}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                  style={{ background: `${ACCENT_MAP.paused}18`, color: ACCENT_MAP.paused }}>
+                  <Pause className="w-4 h-4" />Tạm dừng
+                </button>
+                <button onClick={reset}
+                  className={clsx('w-9 h-9 rounded-xl flex items-center justify-center transition-colors',
+                    isFullscreen ? 'text-white/40 hover:bg-white/10 hover:text-white/70' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700')}>
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
-          {mode === 'done' && (
-            <>
-              <button
-                onClick={startBreak}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success-50 dark:bg-success-500/10 text-success-600 dark:text-success-400 text-sm font-medium hover:bg-success-100 transition-colors"
-              >
-                <Play className="w-4 h-4" />Nghỉ {BREAK_MINUTES}p
-              </button>
-              <button
-                onClick={reset}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-sm font-medium hover:bg-primary-100 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />Pomodoro mới
-              </button>
-            </>
-          )}
+            {mode === 'paused' && (
+              <>
+                <button onClick={resume}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                  style={{ background: `${accent}18`, color: accent }}>
+                  <Play className="w-4 h-4" />Tiếp tục
+                </button>
+                <button onClick={reset}
+                  className={clsx('w-9 h-9 rounded-xl flex items-center justify-center transition-colors',
+                    isFullscreen ? 'text-white/40 hover:bg-white/10 hover:text-white/70' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700')}>
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
-          {mode === 'break' && (
-            <button
-              onClick={skipBreak}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 text-sm font-medium hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
-            >
-              <SkipForward className="w-4 h-4" />Bỏ qua nghỉ
-            </button>
-          )}
+            {mode === 'done' && (
+              <>
+                <button onClick={startBreak}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                  style={{ background: `${ACCENT_MAP.break}18`, color: ACCENT_MAP.break }}>
+                  <Play className="w-4 h-4" />Nghỉ {BREAK_MINUTES}p
+                </button>
+                <button onClick={reset}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: `${accent}12`, color: accent }}>
+                  <RotateCcw className="w-4 h-4" />Pomo mới
+                </button>
+              </>
+            )}
+
+            {mode === 'break' && (
+              <button onClick={skipBreak}
+                className={clsx('flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+                  isFullscreen ? 'bg-white/8 text-white/60 hover:bg-white/15' : 'bg-surface-100 dark:bg-surface-800 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700')}>
+                <SkipForward className="w-4 h-4" />Bỏ qua nghỉ
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Mode hint */}
-      {mode === 'idle' && (
-        <p className="text-xs text-surface-400 text-center shrink-0">
-          Tập trung {FOCUS_MINUTES} phút → nghỉ {BREAK_MINUTES} phút
-        </p>
-      )}
-      
+        {/* Hint */}
+        {mode === 'idle' && (
+          <p className={clsx('text-xs text-center', isFullscreen ? 'text-white/25' : 'text-surface-400')}>
+            Tập trung {FOCUS_MINUTES} phút → nghỉ {BREAK_MINUTES} phút
+          </p>
+        )}
       </div>
     </div>
   )

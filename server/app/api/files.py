@@ -6,7 +6,8 @@ import google.generativeai as genai
 from fastapi.responses import StreamingResponse
 
 from app.core.auth import get_user_id
-from app.core.supabase_client import get_supabase
+from app.core.supabase_client import get_supabase, get_user_supabase
+from supabase import Client
 from app.core.config import settings
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -41,7 +42,8 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[st
 @router.post("/upload")
 async def upload_and_process_pdf(
     file: UploadFile = File(...),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """
     Nhận file PDF, trích xuất văn bản, chia nhỏ và tạo embeddings để lưu vào database (RAG).
@@ -71,9 +73,6 @@ async def upload_and_process_pdf(
 
         # Chunking
         chunks = chunk_text(full_text)
-        
-        # Get embeddings for each chunk
-        sb = get_supabase()
         
         for chunk in chunks:
             # Embed content
@@ -112,7 +111,8 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 async def chat_with_documents(
     req: ChatRequest,
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase)
 ):
     """
     Chat với AI dựa trên ngữ cảnh của tất cả tài liệu PDF đã upload (RAG).
@@ -137,7 +137,6 @@ async def chat_with_documents(
         query_embedding = query_embedding_res['embedding']
 
         # 2. Tìm kiếm các chunk tương đồng trong database thông qua RPC function
-        sb = get_supabase()
         rpc_res = sb.rpc(
             "match_document_chunks",
             {

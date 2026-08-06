@@ -25,9 +25,11 @@ import { Flame, Trophy } from 'lucide-react'
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  mobileOpen?: boolean
+  onCloseMobile?: () => void
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const location = useLocation()
   const { profile } = useProfile()
   const { t } = useLanguage()
@@ -46,13 +48,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { to: '/analytics', icon: BarChart3,       label: t('nav.analytics') },
   ]
 
+  const handleLinkClick = () => {
+    if (onCloseMobile) onCloseMobile()
+  }
+
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-full z-30 flex flex-col',
+        'fixed left-0 top-0 h-full z-40 flex flex-col',
         'bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-700',
         'transition-all duration-300 ease-in-out',
-        collapsed ? 'w-[72px]' : 'w-64',
+        'w-64 md:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        collapsed ? 'md:w-[72px]' : 'md:w-64',
       )}
     >
       {/* Logo */}
@@ -61,7 +69,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div className="w-9 h-9 rounded-xl bg-gradient-brand flex items-center justify-center shrink-0 shadow-glow-sm">
             <GraduationCap className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
-          {!collapsed && (
+          {(!collapsed || mobileOpen) && (
             <div className="overflow-hidden">
               <p className="font-bold text-surface-900 dark:text-white text-sm leading-tight truncate">
                 Student OS
@@ -77,15 +85,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 scrollable">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to}>
+          <NavLink key={to} to={to} onClick={handleLinkClick}>
             {({ isActive }) => (
               <div
                 className={clsx(
                   'sidebar-item',
                   isActive && 'active',
-                  collapsed && 'justify-center px-2',
+                  collapsed && !mobileOpen && 'justify-center px-2',
                 )}
-                title={collapsed ? label : undefined}
+                title={collapsed && !mobileOpen ? label : undefined}
               >
                 <Icon
                   className={clsx(
@@ -96,10 +104,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   )}
                   strokeWidth={isActive ? 2.5 : 2}
                 />
-                {!collapsed && (
+                {(!collapsed || mobileOpen) && (
                   <span className="truncate">{label}</span>
                 )}
-                {!collapsed && isActive && (
+                {(!collapsed || mobileOpen) && isActive && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-500" />
                 )}
               </div>
@@ -109,7 +117,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* Gamification Stats */}
-      {!collapsed && profile && (
+      {(!collapsed || mobileOpen) && profile && (
         <div className="px-4 py-3 mx-3 mb-2 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-bold text-sm" title="Chuỗi ngày học liên tiếp">
             <Flame className="w-4 h-4" fill="currentColor" /> {profile.current_streak}
@@ -122,7 +130,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Bottom: Settings + Collapse toggle */}
       <div className="px-3 py-4 border-t border-surface-200 dark:border-surface-700 space-y-1">
-        <NavLink to="/settings">
+        <NavLink to="/settings" onClick={handleLinkClick}>
           {({ isActive }) => (
             <div
               className={clsx(
@@ -142,16 +150,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <User className={clsx('w-5 h-5', isActive ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 group-hover:text-surface-500')} />
               )}
               
-              {!collapsed && <span>{t('nav.settings')}</span>}
+              {(!collapsed || mobileOpen) && <span>{t('nav.settings')}</span>}
             </div>
           )}
         </NavLink>
 
-        {/* Collapse button */}
+        {/* Collapse button - hidden on mobile viewports */}
         <button
           onClick={onToggle}
           className={clsx(
-            'sidebar-item w-full',
+            'sidebar-item w-full md:flex hidden',
             collapsed && 'justify-center px-2',
           )}
           title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}

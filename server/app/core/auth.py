@@ -25,15 +25,13 @@ def get_current_user(
     """
     token = credentials.credentials
     try:
-        # Tự giải mã payload bằng base64 để hoàn toàn bỏ qua python-jose
-        # Tránh lỗi The specified alg value is not allowed do ES256
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT format")
-            
-        payload_b64 = parts[1]
-        payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+        # Sử dụng python-jose để verify signature và tự động kiểm tra hết hạn (exp)
+        payload = jwt.decode(
+            token,
+            settings.supabase_jwt_secret,
+            algorithms=["HS256"],
+            options={"verify_aud": False}
+        )
         
         user_id: str | None = payload.get("sub")
         if not user_id:
@@ -43,7 +41,7 @@ def get_current_user(
             )
         # Trả về cả payload để router có thể truy cập email, role, etc.
         return payload
-    except Exception as exc:
+    except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token không hợp lệ hoặc hết hạn: {str(exc)}",

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, Search, Sun, Moon, LogOut, Settings, User } from 'lucide-react'
+import { Bell, Search, Sun, Moon, LogOut, Settings, User, Menu } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { CommandPalette } from './CommandPalette'
 import { NotificationsDropdown } from './NotificationsDropdown'
 import { useNotifications } from '@/hooks/useNotifications'
+import { clsx } from 'clsx'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -23,9 +24,10 @@ interface TopbarProps {
   sidebarCollapsed: boolean
   darkMode: boolean
   onToggleDark: () => void
+  onToggleMobileMenu?: () => void
 }
 
-export function Topbar({ sidebarCollapsed, darkMode, onToggleDark }: TopbarProps) {
+export function Topbar({ sidebarCollapsed, darkMode, onToggleDark, onToggleMobileMenu }: TopbarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
@@ -82,14 +84,25 @@ export function Topbar({ sidebarCollapsed, darkMode, onToggleDark }: TopbarProps
 
   return (
     <header
-      className="fixed top-0 right-0 z-20 h-16 flex items-center gap-4 px-6
-                 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md
-                 border-b border-surface-200 dark:border-surface-700
-                 transition-all duration-300"
-      style={{
-        left: sidebarCollapsed ? '72px' : '256px',
-      }}
+      className={clsx(
+        "fixed top-0 right-0 z-20 h-16 flex items-center gap-4 px-6",
+        "bg-white/80 dark:bg-surface-900/80 backdrop-blur-md",
+        "border-b border-surface-200 dark:border-surface-700",
+        "transition-all duration-300 left-0",
+        sidebarCollapsed ? "md:left-[72px]" : "md:left-64"
+      )}
     >
+      {/* Mobile Menu Toggle Button */}
+      {onToggleMobileMenu && (
+        <button
+          onClick={onToggleMobileMenu}
+          className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 md:hidden transition-colors"
+          title="Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Page title */}
       <h1 className="font-semibold text-surface-900 dark:text-white text-base flex-1">
         {title}

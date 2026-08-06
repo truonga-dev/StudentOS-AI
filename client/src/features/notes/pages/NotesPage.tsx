@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { FileText, Plus, Search, Loader2, Trash2, Save, AlertCircle, Sparkles, CheckSquare, ArrowDownToLine, Image as ImageIcon, Smile, Heading1, Heading2, Heading3, Bold, Italic, List, ListOrdered, Quote, Table, Network } from 'lucide-react'
+import { FileText, Plus, Search, Loader2, Trash2, Save, AlertCircle, Sparkles, CheckSquare, ArrowDownToLine, Image as ImageIcon, Smile, Heading1, Heading2, Heading3, Bold, Italic, List, ListOrdered, Quote, Table, Network, ArrowLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotes } from '@/hooks/useNotes'
 import { useSubjects } from '@/hooks/useSubjects'
@@ -9,6 +9,7 @@ import { useTasks } from '@/hooks/useTasks'
 import { summarizeText, suggestTasks, generateFlashcardsFromText, generateQuiz, generateMindmap } from '@/services/ai'
 import { DocumentUploader } from '@/features/files/components/DocumentUploader'
 import { MermaidChart } from '@/components/MermaidChart'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import toast from 'react-hot-toast'
 import type { CreateNoteInput } from '@/types'
 import ReactMarkdown from 'react-markdown'
@@ -85,6 +86,8 @@ export function NotesPage() {
   const { subjects } = useSubjects()
   const { addMultipleFlashcards } = useFlashcards()
   const { addTask } = useTasks()
+  const isMobile = useMediaQuery('(max-width: 1023px)')
+  const [mobileActiveView, setMobileActiveView] = useState<'list' | 'editor'>('list')
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     return sessionStorage.getItem('lastSelectedNoteId')
   })
@@ -195,6 +198,7 @@ export function NotesPage() {
       setEditContent(note.content)
       setEditTitle(note.title)
       setAiResult(null)
+      setMobileActiveView('editor')
     }
   }
 
@@ -406,72 +410,75 @@ export function NotesPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-112px)] flex gap-6 animate-slide-up">
+    <div className="max-w-7xl mx-auto h-[calc(100vh-112px)] flex gap-6 animate-slide-up relative">
       {/* Sidebar list */}
-      <div className="w-80 shrink-0 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title text-xl">Ghi chú</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            className="w-9 h-9 rounded-xl bg-gradient-brand text-white flex items-center justify-center shadow-glow-sm hover:shadow-glow transition-all"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-          <input className="input pl-10" placeholder="Tìm ghi chú..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-danger-50 dark:bg-danger-500/10 text-danger-600 dark:text-danger-400 text-xs">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />{error}
+      {(!isMobile || mobileActiveView === 'list') && (
+        <div className="w-full md:w-80 shrink-0 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="section-title text-xl">Ghi chú</h2>
+            <button
+              onClick={() => setShowModal(true)}
+              className="w-9 h-9 rounded-xl bg-gradient-brand text-white flex items-center justify-center shadow-glow-sm hover:shadow-glow transition-all"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
-        )}
 
-        <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-          {filtered.length === 0 && (
-            <div className="text-center py-10 text-surface-400">
-              <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Chưa có ghi chú nào</p>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+            <input className="input pl-10" placeholder="Tìm ghi chú..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-danger-50 dark:bg-danger-500/10 text-danger-600 dark:text-danger-400 text-xs">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />{error}
             </div>
           )}
-          {filtered.map(note => (
-            <div
-              key={note.id}
-              onClick={() => handleSelectNote(note.id)}
-              className={clsx(
-                'p-4 rounded-xl border-l-4 cursor-pointer transition-all duration-150 group relative',
-                getBorderColor(note.subjects?.color),
-                selected?.id === note.id
-                  ? 'bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/30'
-                  : 'bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600',
-              )}
-            >
-              <h4 className="font-semibold text-sm text-surface-900 dark:text-white mb-1 truncate pr-6">{note.title}</h4>
-              <p className="text-xs text-surface-500 dark:text-surface-400 line-clamp-2 mb-2">
-                {note.content
-                  ? note.content.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() || 'Chưa có nội dung...'
-                  : 'Chưa có nội dung...'}
-              </p>
-              <div className="flex items-center gap-1 flex-wrap">
-                {note.subjects && <span className="badge-neutral">{note.subjects.title}</span>}
-                <span className="ml-auto text-2xs text-surface-400">{formatDate(note.updated_at)}</span>
+
+          <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+            {filtered.length === 0 && (
+              <div className="text-center py-10 text-surface-400">
+                <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Chưa có ghi chú nào</p>
               </div>
-              <button
-                onClick={e => { e.stopPropagation(); handleDelete(note.id) }}
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md hover:bg-danger-50 dark:hover:bg-danger-500/10 flex items-center justify-center text-surface-400 hover:text-danger-500 transition-all"
+            )}
+            {filtered.map(note => (
+              <div
+                key={note.id}
+                onClick={() => handleSelectNote(note.id)}
+                className={clsx(
+                  'p-4 rounded-xl border-l-4 cursor-pointer transition-all duration-150 group relative',
+                  getBorderColor(note.subjects?.color),
+                  selected?.id === note.id
+                    ? 'bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/30'
+                    : 'bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600',
+                )}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+                <h4 className="font-semibold text-sm text-surface-900 dark:text-white mb-1 truncate pr-6">{note.title}</h4>
+                <p className="text-xs text-surface-500 dark:text-surface-400 line-clamp-2 mb-2">
+                  {note.content
+                    ? note.content.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() || 'Chưa có nội dung...'
+                    : 'Chưa có nội dung...'}
+                </p>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {note.subjects && <span className="badge-neutral">{note.subjects.title}</span>}
+                  <span className="ml-auto text-2xs text-surface-400">{formatDate(note.updated_at)}</span>
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); handleDelete(note.id) }}
+                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md hover:bg-danger-50 dark:hover:bg-danger-500/10 flex items-center justify-center text-surface-400 hover:text-danger-500 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Editor area (The Notion Canvas) */}
-      <div className="flex-1 bg-white dark:bg-surface-900 rounded-2xl shadow-card border border-surface-200 dark:border-surface-800 flex overflow-hidden relative min-w-0">
+      {(!isMobile || mobileActiveView === 'editor') && (
+        <div className="flex-1 bg-white dark:bg-surface-900 rounded-2xl shadow-card border border-surface-200 dark:border-surface-800 flex overflow-hidden relative min-w-0">
         {selected ? (
           <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col relative w-full scroll-smooth">
             {/* Cover Image */}
@@ -506,6 +513,14 @@ export function NotesPage() {
             <div className="flex-1 flex w-full max-w-[1400px] mx-auto relative">
               {/* Main Editor Column */}
               <div className="flex-1 min-w-0 px-8 md:px-16 pb-32 flex flex-col relative pt-12">
+                {isMobile && (
+                  <button
+                    onClick={() => setMobileActiveView('list')}
+                    className="flex items-center gap-2 text-surface-500 hover:text-surface-800 dark:hover:text-surface-200 text-sm font-semibold mb-6 px-1 py-2 w-fit rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+                  </button>
+                )}
                 
                 {/* Notion Hover Actions (above title) */}
                 <div className="absolute top-4 left-8 md:left-16 flex items-center gap-4 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity z-20">
@@ -937,6 +952,7 @@ export function NotesPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Add Note Modal */}
       {showModal && (

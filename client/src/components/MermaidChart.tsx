@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { Loader2 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface MermaidChartProps {
   chart: string;
@@ -88,7 +89,7 @@ export function MermaidChart({ chart }: MermaidChartProps) {
     <div 
       ref={chartRef}
       className="mermaid-chart flex justify-center bg-white dark:bg-surface-800 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-700 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }}
     />
   );
 }

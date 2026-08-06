@@ -9,20 +9,44 @@
 -- Xóa policy cũ
 DROP POLICY IF EXISTS "chat_members: read all" ON public.chat_members;
 
--- Tạo policy mới an toàn hơn
+-- Tạo 2 helper function SECURITY DEFINER để tránh vòng lặp đệ quy RLS:
+-- chat_channels policy → query chat_members → chat_members policy → query chat_channels → ♾️
+-- Giải pháp: dùng SECURITY DEFINER function, chạy với quyền superuser, hoàn toàn bypass RLS
+
+-- Function 1: Kiểm tra kênh có public không (bypass chat_channels RLS)
+CREATE OR REPLACE FUNCTION public.is_channel_global(p_channel_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT is_global FROM public.chat_channels WHERE id = p_channel_id),
+    false
+  );
+$$;
+
+-- Function 2: Kiểm tra user có là member của kênh không (bypass chat_members RLS)
+CREATE OR REPLACE FUNCTION public.is_member_of_channel(p_channel_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.chat_members
+    WHERE channel_id = p_channel_id AND user_id = auth.uid()
+  );
+$$;
+
+-- Tạo policy mới dùng 2 function trên (không tham chiếu trực tiếp sang bảng khác)
 CREATE POLICY "chat_members: read all" ON public.chat_members
   FOR SELECT USING (
-    -- Chỉ cho phép nếu kênh là kênh Public (is_global = true)
-    EXISTS (
-      SELECT 1 FROM public.chat_channels cc 
-      WHERE cc.id = chat_members.channel_id AND cc.is_global = true
-    )
+    public.is_channel_global(chat_members.channel_id)
     OR
-    -- Hoặc người dùng là thành viên của kênh đó
-    EXISTS (
-      SELECT 1 FROM public.chat_members cm 
-      WHERE cm.channel_id = chat_members.channel_id AND cm.user_id = auth.uid()
-    )
+    public.is_member_of_channel(chat_members.channel_id)
   );
 
 -- ── 2. Add Anti-spam (Rate Limit) cho community_messages ────────────

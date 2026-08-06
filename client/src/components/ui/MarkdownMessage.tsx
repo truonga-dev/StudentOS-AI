@@ -23,6 +23,28 @@ export const MarkdownMessage = memo(({ content }: MarkdownMessageProps) => {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
       components={{
+        p({ children, ...props }: any) {
+          return (
+            <p {...props}>
+              {React.Children.map(children, child => {
+                if (typeof child === 'string') {
+                  const parts = child.split(/(@[A-ZÀ-ỹa-z0-9_][A-ZÀ-ỹa-z0-9_#\-\s]{0,30}(?=\s|$|[.,!?;]))/g)
+                  return parts.map((part, i) => {
+                    if (part.startsWith('@')) {
+                      return (
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-semibold text-xs inline-block mx-0.5">
+                          {part}
+                        </span>
+                      )
+                    }
+                    return part
+                  })
+                }
+                return child
+              })}
+            </p>
+          )
+        },
         code({ node, inline, className, children, ...props }: any) {
           const match = /language-(\w+)/.exec(className || '')
           const language = match ? match[1] : ''

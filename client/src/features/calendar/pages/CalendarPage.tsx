@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Plus, CheckSquare, Clock, MapPin, Trash2, Loader2, Calendar, LayoutGrid } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTasks } from '@/hooks/useTasks'
 import { useCalendarEvents } from '@/hooks/useCalendarEvents'
 import { useSubjects } from '@/hooks/useSubjects'
@@ -23,6 +24,7 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 export function CalendarPage() {
   const today = new Date()
+  const isMobile = useMediaQuery('(max-width: 767px)')
   const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
   const [showEventModal, setShowEventModal] = useState(false)
@@ -155,30 +157,32 @@ export function CalendarPage() {
           <h2 className="section-title text-xl">Lịch học</h2>
           <p className="section-subtitle mt-0.5">Quản lý lịch học và deadline</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-surface-100 dark:bg-surface-800 p-1 rounded-xl flex items-center">
-            <button
-              onClick={() => setViewMode('month')}
-              className={clsx(
-                "px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
-                viewMode === 'month' ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
-              )}
-            >
-              <LayoutGrid className="w-4 h-4" /> Tháng
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={clsx(
-                "px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
-                viewMode === 'week' ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
-              )}
-            >
-              <Calendar className="w-4 h-4" /> Tuần
-            </button>
-          </div>
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          {!isMobile && (
+            <div className="bg-surface-100 dark:bg-surface-800 p-1 rounded-xl flex items-center">
+              <button
+                onClick={() => setViewMode('month')}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
+                  viewMode === 'month' ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                )}
+              >
+                <LayoutGrid className="w-4 h-4" /> Tháng
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
+                  viewMode === 'week' ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                )}
+              >
+                <Calendar className="w-4 h-4" /> Tuần
+              </button>
+            </div>
+          )}
           <button
             onClick={() => openModalForDate(selectedDay)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-brand text-white text-sm font-semibold shadow-glow-sm hover:opacity-90 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-brand text-white text-sm font-semibold shadow-glow-sm hover:opacity-90 transition-all w-full md:w-auto justify-center"
           >
             <Plus className="w-4 h-4" />Thêm sự kiện
           </button>
@@ -187,7 +191,7 @@ export function CalendarPage() {
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Calendar */}
-        <div className="card p-6 flex-1 overflow-x-auto min-w-[500px]">
+        <div className={clsx("card p-6 flex-1", isMobile ? "w-full overflow-hidden" : "overflow-x-auto min-w-[500px]")}>
           {/* Nav */}
           <div className="flex items-center justify-between mb-6">
             <button 
@@ -243,7 +247,7 @@ export function CalendarPage() {
           </div>
 
           {/* Cells */}
-          <div className="grid grid-cols-7 gap-1 min-h-[500px]">
+          <div className={clsx("grid grid-cols-7 gap-1", isMobile ? "min-h-[280px]" : "min-h-[500px]")}>
             {cells.map((day, i) => {
               const isToday = day === today.getDate() && current.month === today.getMonth() && current.year === today.getFullYear()
               const isSelected = day === selectedDay
@@ -258,7 +262,8 @@ export function CalendarPage() {
                   key={i}
                   onClick={() => day && setSelectedDay(day)}
                   className={clsx(
-                    'min-h-[100px] p-1.5 rounded-xl transition-colors cursor-pointer group',
+                    'p-1.5 rounded-xl transition-colors cursor-pointer group flex flex-col justify-start',
+                    isMobile ? 'min-h-[48px]' : 'min-h-[100px]',
                     day ? 'hover:bg-surface-50 dark:hover:bg-surface-800' : 'pointer-events-none opacity-0',
                     isToday && !isSelected ? 'bg-primary-50 dark:bg-primary-500/10' : '',
                     isSelected ? 'bg-primary-100 dark:bg-primary-500/20 ring-2 ring-primary-400 dark:ring-primary-500' : '',
@@ -272,36 +277,42 @@ export function CalendarPage() {
                       )}>
                         {day}
                       </span>
-                      <div className="space-y-0.5 overflow-hidden max-h-[60px]">
-                        {/* Hiển thị Events trước */}
-                        {dayEvents.slice(0, 2).map((event) => (
-                          <div
-                            key={event.id}
-                            className="px-1.5 py-0.5 rounded text-[10px] text-white truncate shadow-sm"
-                            style={{ backgroundColor: event.color || '#6366f1' }}
-                          >
-                            {event.start_time && new Date(event.start_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {event.title}
-                          </div>
-                        ))}
-                        {/* Sau đó là Tasks */}
-                        {dayTasks.slice(0, 2 - Math.min(dayEvents.length, 2)).map((task) => (
-                          <div
-                            key={task.id}
-                            className={clsx(
-                              'px-1.5 py-0.5 rounded text-[10px] text-white truncate shadow-sm flex items-center gap-1',
-                              PRIORITY_COLOR[task.priority],
-                              task.completed && 'opacity-50 line-through'
-                            )}
-                          >
-                            <CheckSquare className="w-3 h-3 shrink-0" />
-                            {task.title}
-                          </div>
-                        ))}
-                        
-                        {allItems.length > 2 && (
-                          <div className="text-[10px] text-surface-400 pl-1 font-medium text-center">+{allItems.length - 2} nữa</div>
-                        )}
-                      </div>
+                      {isMobile ? (
+                        hasItems && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary-500 mx-auto mt-0.5" />
+                        )
+                      ) : (
+                        <div className="space-y-0.5 overflow-hidden max-h-[60px]">
+                          {/* Hiển thị Events trước */}
+                          {dayEvents.slice(0, 2).map((event) => (
+                            <div
+                              key={event.id}
+                              className="px-1.5 py-0.5 rounded text-[10px] text-white truncate shadow-sm"
+                              style={{ backgroundColor: event.color || '#6366f1' }}
+                            >
+                              {event.start_time && new Date(event.start_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {event.title}
+                            </div>
+                          ))}
+                          {/* Sau đó là Tasks */}
+                          {dayTasks.slice(0, 2 - Math.min(dayEvents.length, 2)).map((task) => (
+                            <div
+                              key={task.id}
+                              className={clsx(
+                                'px-1.5 py-0.5 rounded text-[10px] text-white truncate shadow-sm flex items-center gap-1',
+                                PRIORITY_COLOR[task.priority],
+                                task.completed && 'opacity-50 line-through'
+                              )}
+                            >
+                              <CheckSquare className="w-3 h-3 shrink-0" />
+                              {task.title}
+                            </div>
+                          ))}
+                          
+                          {allItems.length > 2 && (
+                            <div className="text-[10px] text-surface-400 pl-1 font-medium text-center">+{allItems.length - 2} nữa</div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

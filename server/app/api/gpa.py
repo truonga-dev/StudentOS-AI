@@ -4,7 +4,8 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.auth import get_user_id
-from app.core.supabase_client import get_supabase
+from app.core.supabase_client import get_supabase, get_user_supabase
+from supabase import Client
 
 router = APIRouter(prefix="/gpa", tags=["gpa"])
 
@@ -25,9 +26,8 @@ class GradeOut(BaseModel):
     created_at: str
 
 @router.get("/grades", response_model=List[GradeOut])
-async def list_grades(subject_id: Optional[str] = None, user_id: str = Depends(get_user_id)):
+async def list_grades(subject_id: Optional[str] = None, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """Lấy danh sách điểm số. Có thể lọc theo subject_id."""
-    sb = get_supabase()
     query = sb.table("grades").select("*").eq("user_id", user_id)
     if subject_id:
         query = query.eq("subject_id", subject_id)
@@ -40,9 +40,8 @@ async def list_grades(subject_id: Optional[str] = None, user_id: str = Depends(g
         return []
 
 @router.post("/grades", response_model=GradeOut, status_code=status.HTTP_201_CREATED)
-async def create_grade(body: GradeCreate, user_id: str = Depends(get_user_id)):
+async def create_grade(body: GradeCreate, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """Thêm một cột điểm mới."""
-    sb = get_supabase()
     payload = body.model_dump(exclude_none=True, mode="json")
     payload["user_id"] = user_id
     
@@ -56,22 +55,20 @@ async def create_grade(body: GradeCreate, user_id: str = Depends(get_user_id)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_grade(grade_id: str, user_id: str = Depends(get_user_id)):
+async def delete_grade(grade_id: str, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """Xóa cột điểm."""
-    sb = get_supabase()
     try:
         sb.table("grades").delete().eq("id", grade_id).eq("user_id", user_id).execute()
     except Exception as e:
         print(f"Error deleting grade: {e}")
 
 @router.get("/summary")
-async def get_gpa_summary(user_id: str = Depends(get_user_id)):
+async def get_gpa_summary(user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     """
     Tính toán GPA hệ 10 và hệ 4 của từng học kỳ và tổng quát.
     GPA tổng quát = Tổng (Điểm trung bình môn * Tín chỉ) / Tổng số tín chỉ
     Điểm trung bình môn = Tổng (Score * Weight)
     """
-    sb = get_supabase()
     
     # 1. Fetch all subjects
     subjects_res = sb.table("subjects").select("*").eq("user_id", user_id).execute()

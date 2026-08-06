@@ -171,6 +171,7 @@ export interface ChatChannel {
   id: string
   name: string
   description: string | null
+  category?: string | null
   logo_url: string | null
   creator_id: string | null
   is_archived: boolean

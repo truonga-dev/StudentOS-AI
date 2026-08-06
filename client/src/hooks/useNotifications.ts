@@ -40,11 +40,13 @@ export function useNotifications() {
   useEffect(() => {
     loadNotifications()
 
-    // Setup realtime subscription (sync, không async để tránh lỗi subscribe order)
     let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return
+    const setupSubscription = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      // Nếu component đã unmount trước khi async hoàn thành thì bỏ qua
+      if (cancelled || !session) return
 
       const channelName = `notifications-${session.user.id}-${Date.now()}`
       channel = supabase
@@ -63,9 +65,12 @@ export function useNotifications() {
           }
         )
         .subscribe()
-    })
+    }
+
+    setupSubscription()
 
     return () => {
+      cancelled = true
       if (channel) {
         supabase.removeChannel(channel)
       }
