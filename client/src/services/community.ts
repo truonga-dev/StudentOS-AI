@@ -44,16 +44,22 @@ export async function getMessages(channelId: string, limit = 50, cursor?: string
     .select('*, profile:profiles(id, full_name, avatar_url, rank_tier, level)')
     .eq('channel_id', channelId)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit)
 
   if (cursor) {
-    query = query.lt('created_at', cursor)
+    query = query.lte('created_at', cursor)
   }
 
   const { data, error } = await query
 
   if (error) throw error
-  return data as CommunityMessage[]
+  
+  // Lọc bỏ tin nhắn trùng lặp do dùng lte (bằng Set hoặc filter) 
+  // Cách này đảm bảo không bị lỗi mất tin nhắn khi cùng timestamp
+  const uniqueData = data ? Array.from(new Map(data.map(item => [item.id, item])).values()) : []
+  
+  return uniqueData as CommunityMessage[]
 }
 
 export async function sendMessage(channelId: string, content: string, attachments: any[] | null = null, replyTo: string | null = null) {
@@ -93,6 +99,29 @@ export async function updateMessage(messageId: string, content: string) {
 }
 
 export async function unsendMessage(messageId: string) {
+  // 1. Fetch current message to get attachments
+  const { data: msgData } = await supabase
+    .from('community_messages')
+    .select('attachments')
+    .eq('id', messageId)
+    .single()
+
+  if (msgData?.attachments && Array.isArray(msgData.attachments)) {
+    const BUCKET = import.meta.env.VITE_STORAGE_BUCKET ?? 'student-files'
+    const pathsToDelete = msgData.attachments
+      .filter((att: any) => att.url && att.url.includes(BUCKET))
+      .map((att: any) => {
+        const parts = att.url.split(`${BUCKET}/`);
+        return parts.length > 1 ? parts[1] : null;
+      })
+      .filter(Boolean)
+      
+    if (pathsToDelete.length > 0) {
+      await supabase.storage.from(BUCKET).remove(pathsToDelete)
+    }
+  }
+
+  // 2. Perform soft delete
   const { data, error } = await supabase
     .from('community_messages')
     .update({ is_deleted: true, content: '', attachments: null })

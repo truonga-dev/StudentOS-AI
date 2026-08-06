@@ -451,7 +451,9 @@ export function NotesPage() {
             >
               <h4 className="font-semibold text-sm text-surface-900 dark:text-white mb-1 truncate pr-6">{note.title}</h4>
               <p className="text-xs text-surface-500 dark:text-surface-400 line-clamp-2 mb-2">
-                {note.content || 'Chưa có nội dung...'}
+                {note.content
+                  ? note.content.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() || 'Chưa có nội dung...'
+                  : 'Chưa có nội dung...'}
               </p>
               <div className="flex items-center gap-1 flex-wrap">
                 {note.subjects && <span className="badge-neutral">{note.subjects.title}</span>}

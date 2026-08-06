@@ -130,8 +130,10 @@ export function useCommunity(activeChannelId: string | null) {
       const realMsg = await communityService.sendMessage(activeChannelId, content, attachments, replyTo)
       setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m))
     } catch (e: any) {
-      setError(e.message)
+      // Xóa tin nhắn optimistic khi gặp lỗi (kể cả lỗi spam)
       setMessages(prev => prev.filter(m => m.id !== tempId))
+      // Ném lỗi ra ngoài để CommunityChatPage có thể hiện toast
+      throw e
     }
   }, [activeChannelId, currentUser])
 
@@ -147,7 +149,12 @@ export function useCommunity(activeChannelId: string | null) {
         setHasMore(false)
       }
       
-      setMessages(prev => [...olderMessages.reverse(), ...prev])
+      setMessages(prev => {
+        // Deduplicate: gộp tin nhắn cũ + hiện tại, lọc bỏ các ID bị trùng
+        const existingIds = new Set(prev.map(m => m.id))
+        const newOldMessages = olderMessages.reverse().filter(m => !existingIds.has(m.id))
+        return [...newOldMessages, ...prev]
+      })
     } catch (e: any) {
       setError(e.message)
     } finally {

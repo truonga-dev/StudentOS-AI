@@ -402,10 +402,14 @@ export function FlashcardsPage() {
                   </div>
                 )}
                 <h3 className="font-bold text-surface-900 dark:text-white text-lg line-clamp-2 text-center mb-2">
-                  {card.question}
+                  {card.question
+                    ? card.question.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"')
+                    : ''}
                 </h3>
                 <p className="text-surface-500 text-sm line-clamp-2 text-center">
-                  {card.answer}
+                  {card.answer
+                    ? card.answer.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"')
+                    : ''}
                 </p>
               </div>
 
