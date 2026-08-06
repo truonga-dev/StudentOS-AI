@@ -48,10 +48,13 @@ async def create_task(body: TaskCreate, user_id: str = Depends(get_user_id), sb:
     """Tạo task mới."""
     payload = body.model_dump(mode="json")
     payload["user_id"] = user_id
-    res = sb.table("tasks").insert(payload).select("*, subjects(title, color)").execute()
+    res = sb.table("tasks").insert(payload).execute()
     if not res.data:
         raise HTTPException(status_code=500, detail="Không tạo được task")
-    return res.data[0]
+    
+    # Fetch the newly created task with relations (subject details)
+    new_task = sb.table("tasks").select("*, subjects(title, color)").eq("id", res.data[0]["id"]).execute()
+    return new_task.data[0]
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
@@ -70,12 +73,14 @@ async def update_task(
         .update(data)
         .eq("id", task_id)
         .eq("user_id", user_id)
-        .select("*, subjects(title, color)")
         .execute()
     )
     if not res.data:
         raise HTTPException(status_code=404, detail="Không tìm thấy task")
-    return res.data[0]
+    
+    # Fetch the updated task with relations (subject details)
+    updated_task = sb.table("tasks").select("*, subjects(title, color)").eq("id", task_id).execute()
+    return updated_task.data[0]
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

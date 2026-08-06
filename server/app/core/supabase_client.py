@@ -11,6 +11,11 @@ from app.core.config import settings
 security = HTTPBearer()
 
 @lru_cache(maxsize=1)
+def get_supabase_admin() -> Client:
+    """Admin client dùng để verify token qua Supabase Auth API."""
+    return create_client(settings.supabase_url, settings.supabase_service_key)
+
+@lru_cache(maxsize=1)
 def get_supabase() -> Client:
     """Admin client (Service Role) - Bypasses RLS. Use with caution."""
     return create_client(settings.supabase_url, settings.supabase_service_key)

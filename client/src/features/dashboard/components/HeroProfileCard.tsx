@@ -3,15 +3,16 @@ import { clsx } from 'clsx'
 import { useNavigate } from 'react-router-dom'
 
 const RANK_CONFIG = {
-  Bronze:   { icon: ShieldAlert, color: '#cd7f32', bg: 'from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20', ring: '#cd7f32', label: '🥉 Bronze' },
-  Silver:   { icon: Shield,      color: '#94a3b8', bg: 'from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800',             ring: '#94a3b8', label: '🥈 Silver' },
-  Gold:     { icon: Award,       color: '#f59e0b', bg: 'from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20',   ring: '#f59e0b', label: '🥇 Gold' },
-  Platinum: { icon: Star,        color: '#2dd4bf', bg: 'from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20',         ring: '#2dd4bf', label: '💎 Platinum' },
-  Diamond:  { icon: Trophy,      color: '#06b6d4', bg: 'from-cyan-50 to-sky-50 dark:from-cyan-900/20 dark:to-sky-900/20',           ring: '#06b6d4', label: '👑 Diamond' },
+  Bronze: { icon: ShieldAlert, color: '#cd7f32', bg: 'from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20', ring: '#cd7f32', label: '🥉 Đồng' },
+  Silver: { icon: Shield, color: '#94a3b8', bg: 'from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800', ring: '#94a3b8', label: '🥈 Bạc' },
+  Gold: { icon: Award, color: '#f59e0b', bg: 'from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20', ring: '#f59e0b', label: '🥇 Vàng' },
+  Platinum: { icon: Star, color: '#2dd4bf', bg: 'from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20', ring: '#2dd4bf', label: '💎 Bạch Kim' },
+  Diamond: { icon: Trophy, color: '#06b6d4', bg: 'from-cyan-50 to-sky-50 dark:from-cyan-900/20 dark:to-sky-900/20', ring: '#06b6d4', label: '👑 Kim Cương' },
+  Thach_Dau: { icon: Trophy, color: '#06b6d4', bg: 'from-cyan-50 to-sky-50 dark:from-cyan-900/20 dark:to-sky-900/20', ring: '#06b6d4', label: '💀 Thách Đấu' },
 }
 
 const NEXT_RANK: Record<string, string> = {
-  Bronze: 'Silver', Silver: 'Gold', Gold: 'Platinum', Platinum: 'Diamond', Diamond: 'Diamond',
+  Bronze: 'Đồng', Silver: 'Bạc', Gold: 'Vàng', Platinum: 'Bạch Kim', Diamond: 'Kim Cương', Thach_Dau: 'Thách Đấu',
 }
 
 interface HeroProfileCardProps {
@@ -57,10 +58,10 @@ export function HeroProfileCard({ level, xp, rank, points, displayName, streak =
 
   // XP calculation
   const currentLevelXpStart = level === 1 ? 0 : ((level - 1) * level / 2) * 100
-  const nextLevelXpStart    = (level * (level + 1) / 2) * 100
-  const xpNeeded            = nextLevelXpStart - currentLevelXpStart
-  const xpProgress          = Math.max(0, xp - currentLevelXpStart)
-  const progressPct         = Math.min(100, Math.round((xpProgress / xpNeeded) * 100))
+  const nextLevelXpStart = (level * (level + 1) / 2) * 100
+  const xpNeeded = nextLevelXpStart - currentLevelXpStart
+  const xpProgress = Math.max(0, xp - currentLevelXpStart)
+  const progressPct = Math.min(100, Math.round((xpProgress / xpNeeded) * 100))
 
   return (
     <div className={clsx('card overflow-hidden relative', `bg-gradient-to-br ${config.bg}`)}>
@@ -121,14 +122,14 @@ export function HeroProfileCard({ level, xp, rank, points, displayName, streak =
                 style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)', backgroundSize: '200% 100%' }} />
             </div>
           </div>
-          <p className="text-xs text-surface-400">Còn <strong>{Math.max(0, xpNeeded - xpProgress).toLocaleString()} XP</strong> để đạt Lv {level + 1} · Next rank: <strong>{nextRank}</strong></p>
+          <p className="text-xs text-surface-400">Còn <strong>{Math.max(0, xpNeeded - xpProgress).toLocaleString()} XP</strong> để đạt Lv {level + 1} · Rank tiếp theo: <strong>{nextRank}</strong></p>
         </div>
 
         {/* Quick action */}
         <button onClick={() => navigate('/focus')}
           className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.01]"
           style={{ background: `linear-gradient(135deg, ${config.ring}18, ${config.ring}28)`, color: config.ring }}>
-          <span>🚀 Bắt đầu Focus Session</span>
+          <span>🚀 Bắt đầu học</span>
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>

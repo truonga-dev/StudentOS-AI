@@ -206,92 +206,95 @@ export function FlashcardsPage() {
 
   if (studyMode) {
     const card = studyCards[currentCardIndex]
-    if (!card) return null;
+    if (!card) return null
 
     return (
-      <div className="max-w-2xl mx-auto h-[calc(100vh-112px)] flex flex-col pt-8 animate-fade-in">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-surface-900 dark:text-white">Ôn tập Flashcards</h2>
-            <p className="text-surface-500 mt-1 text-sm">
-              Thẻ {currentCardIndex + 1} / {studyCards.length}
-            </p>
-          </div>
-          <button 
-            onClick={() => setStudyMode(false)}
-            className="p-2 text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-full bg-surface-100 dark:bg-surface-800 h-2 rounded-full mb-12 overflow-hidden">
-          <div 
-            className="bg-primary-500 h-full transition-all duration-300"
-            style={{ width: `${((currentCardIndex) / studyCards.length) * 100}%` }}
-          />
-        </div>
-
-        {/* Card 3D Flip */}
-        <div className="flex-1 perspective-1000">
-          <div 
-            className={clsx(
-              "relative w-full h-[400px] transition-transform duration-500 transform-style-3d cursor-pointer",
-              isFlipped ? "rotate-y-180" : ""
-            )}
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            {/* Mặt trước */}
-            <div className="absolute inset-0 backface-hidden card bg-white dark:bg-surface-800 flex flex-col items-center justify-center p-8 text-center shadow-xl border border-surface-200 dark:border-surface-700">
-              <span className="text-sm font-semibold text-primary-500 uppercase tracking-widest mb-4">Câu hỏi</span>
-              {card?.image_url && (
-                <img src={card.image_url} alt="Flashcard illustration" className="max-h-[160px] object-contain rounded-lg mb-4" />
-              )}
-              <h3 className="text-2xl font-bold text-surface-900 dark:text-white leading-relaxed line-clamp-3">
-                {card?.question}
-              </h3>
-              <p className="absolute bottom-6 text-surface-400 text-sm flex items-center gap-2">
-                <RotateCcw className="w-4 h-4" /> Bấm để xem đáp án
+      <div className="max-w-2xl mx-auto min-h-[calc(100vh-160px)] sm:min-h-[calc(100vh-112px)] flex flex-col justify-between px-4 pt-8 pb-4 sm:py-8 animate-fade-in">
+        <div>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-white">Ôn tập Flashcards</h2>
+              <p className="text-surface-500 mt-0.5 text-xs sm:text-sm">
+                Thẻ {currentCardIndex + 1} / {studyCards.length}
               </p>
             </div>
+            <button 
+              onClick={() => setStudyMode(false)}
+              className="p-2 text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            {/* Mặt sau */}
-            <div className="absolute inset-0 backface-hidden rotate-y-180 card bg-primary-500 text-white flex flex-col items-center justify-center p-8 text-center shadow-xl">
-              <span className="text-sm font-semibold text-primary-200 uppercase tracking-widest mb-6">Đáp án</span>
-              <p className="text-2xl font-medium leading-relaxed whitespace-pre-wrap">
-                {card?.answer}
-              </p>
+          {/* Progress bar */}
+          <div className="w-full bg-surface-100 dark:bg-surface-800 h-1.5 sm:h-2 rounded-full mb-6 sm:mb-8 overflow-hidden">
+            <div 
+              className="bg-primary-500 h-full transition-all duration-300"
+              style={{ width: `${((currentCardIndex) / studyCards.length) * 100}%` }}
+            />
+          </div>
+
+          {/* Card 3D Flip */}
+          <div className="perspective-1000 w-full">
+            <div 
+              className={clsx(
+                "relative w-full h-[320px] sm:h-[420px] transition-transform duration-500 transform-style-3d cursor-pointer",
+                isFlipped ? "rotate-y-180" : ""
+              )}
+              onClick={() => setIsFlipped(!isFlipped)}
+            >
+              {/* Mặt trước */}
+              <div className="absolute inset-0 backface-hidden card bg-white dark:bg-surface-800 flex flex-col items-center justify-center p-6 sm:p-8 text-center shadow-xl border border-surface-200 dark:border-surface-700">
+                <span className="text-xs sm:text-sm font-semibold text-primary-500 uppercase tracking-widest mb-3 sm:mb-4">Câu hỏi</span>
+                {card?.image_url && (
+                  <img src={card.image_url} alt="Flashcard illustration" className="max-h-[100px] sm:max-h-[160px] object-contain rounded-lg mb-4" />
+                )}
+                <h3 className="text-lg sm:text-2xl font-bold text-surface-900 dark:text-white leading-relaxed line-clamp-4 px-2">
+                  {card?.question}
+                </h3>
+                <p className="absolute bottom-4 sm:bottom-6 text-surface-400 text-xs sm:text-sm flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 animate-pulse" /> Bấm để xem đáp án
+                </p>
+              </div>
+
+              {/* Mặt sau */}
+              <div className="absolute inset-0 backface-hidden rotate-y-180 card bg-primary-500 text-white flex flex-col items-center justify-center p-6 sm:p-8 text-center shadow-xl">
+                <span className="text-xs sm:text-sm font-semibold text-primary-200 uppercase tracking-widest mb-4 sm:mb-6">Đáp án</span>
+                <p className="text-lg sm:text-2xl font-medium leading-relaxed whitespace-pre-wrap px-2 overflow-y-auto max-h-[80%] custom-scrollbar">
+                  {card?.answer}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Actions (SM-2 Buttons) */}
         <div className={clsx(
-          "mt-12 flex flex-wrap items-center justify-center gap-4 transition-all duration-300",
+          "mt-6 sm:mt-8 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 w-full max-w-lg mx-auto transition-all duration-300 pb-4",
           isFlipped ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
         )}>
           <button
             onClick={(e) => { e.stopPropagation(); handleStudyAction(1); }}
-            className="btn h-14 px-6 rounded-2xl bg-danger-50 text-danger-600 hover:bg-danger-100 dark:bg-danger-500/10 dark:hover:bg-danger-500/20 font-bold border-none"
+            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-danger-50 text-danger-600 hover:bg-danger-100 dark:bg-danger-500/10 dark:hover:bg-danger-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
           >
-            Lại từ đầu (1 phút)
+            Lại từ đầu (1m)
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleStudyAction(3); }}
-            className="btn h-14 px-6 rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 font-bold border-none"
+            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
           >
             Khó
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleStudyAction(4); }}
-            className="btn h-14 px-6 rounded-2xl bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-500/10 dark:hover:bg-primary-500/20 font-bold border-none"
+            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-500/10 dark:hover:bg-primary-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
           >
             Tốt
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleStudyAction(5); }}
-            className="btn h-14 px-6 rounded-2xl bg-success-50 text-success-600 hover:bg-success-100 dark:bg-success-500/10 dark:hover:bg-success-500/20 font-bold border-none"
+            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-success-50 text-success-600 hover:bg-success-100 dark:bg-success-500/10 dark:hover:bg-success-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
           >
             Dễ
           </button>
@@ -307,8 +310,8 @@ export function FlashcardsPage() {
           <h1 className="text-2xl font-bold text-surface-900 dark:text-white">Flashcards</h1>
           <p className="text-surface-500 mt-1">Học nhanh, nhớ lâu với thẻ ghi nhớ</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 min-w-[200px] md:w-64">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
             <input
               type="text"
@@ -318,24 +321,26 @@ export function FlashcardsPage() {
               className="input pl-9 h-10 w-full"
             />
           </div>
-          <button
-            onClick={startStudy}
-            className="btn btn-secondary h-10 px-4 whitespace-nowrap"
-          >
-            <PlayCircle className="w-4 h-4" /> Học ngay ({dueCards.length})
-          </button>
-          <button
-            onClick={() => setIsAiModalOpen(true)}
-            className="btn bg-gradient-brand text-white shadow-glow-sm hover:shadow-glow h-10 px-4 whitespace-nowrap"
-          >
-            <Sparkles className="w-4 h-4" /> Tạo bằng AI
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary h-10 px-4 whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" /> Tạo thủ công
-          </button>
+          <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
+            <button
+              onClick={startStudy}
+              className="btn btn-secondary h-10 px-2 sm:px-4 whitespace-nowrap text-xs sm:text-sm flex items-center justify-center gap-1"
+            >
+              <PlayCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Học ({dueCards.length})
+            </button>
+            <button
+              onClick={() => setIsAiModalOpen(true)}
+              className="btn bg-gradient-brand text-white shadow-glow-sm hover:shadow-glow h-10 px-2 sm:px-4 whitespace-nowrap text-xs sm:text-sm flex items-center justify-center gap-1"
+            >
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Tạo AI
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn btn-primary h-10 px-2 sm:px-4 whitespace-nowrap text-xs sm:text-sm flex items-center justify-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Thủ công
+            </button>
+          </div>
         </div>
       </div>
 
@@ -363,7 +368,7 @@ export function FlashcardsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCards.map((card) => (
-            <div key={card.id} className="card p-6 group hover:border-primary-200 dark:hover:border-primary-500/30 transition-all flex flex-col h-[200px]">
+            <div key={card.id} className="card p-5 group hover:border-primary-200 dark:hover:border-primary-500/30 transition-all flex flex-col min-h-[220px] justify-between">
               <div className="flex items-center justify-between mb-4">
                 {card.subjects ? (() => {
                   const subjectData = Array.isArray(card.subjects) ? card.subjects[0] : card.subjects;

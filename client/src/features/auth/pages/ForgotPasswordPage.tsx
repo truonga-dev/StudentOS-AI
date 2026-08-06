@@ -87,7 +87,7 @@ export function ForgotPasswordPage() {
                          bg-white dark:bg-surface-900 text-surface-900 dark:text-white 
                          focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 
                          transition-all duration-200 outline-none"
-              placeholder="you@example.com"
+              placeholder="nguyenvana@gmail.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
               disabled={loading}

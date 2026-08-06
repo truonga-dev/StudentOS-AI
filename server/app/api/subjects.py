@@ -37,6 +37,7 @@ async def update_subject(
     res = (
         sb.table("subjects")
         .update(data)
+        .select("*")
         .eq("id", subject_id)
         .eq("user_id", user_id)  # Đảm bảo chỉ cập nhật subject của mình
         .execute()

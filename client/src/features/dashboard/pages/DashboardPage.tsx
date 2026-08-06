@@ -23,9 +23,9 @@ import { AIWeeklyReport } from '@/features/dashboard/components/AIWeeklyReport'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_COLORS: Record<string, string> = {
-  high:   'badge-danger',
+  high: 'badge-danger',
   medium: 'badge-warning',
-  low:    'badge-success',
+  low: 'badge-success',
 }
 const PRIORITY_LABELS: Record<string, string> = {
   high: 'Khẩn', medium: 'Bình thường', low: 'Thấp',
@@ -36,6 +36,14 @@ const DAILY_QUOTES = [
   'Không cần hoàn hảo ngay từ đầu, chỉ cần bắt đầu. ✨',
   'Bộ não của bạn là cơ bắp — luyện tập mỗi ngày nó sẽ mạnh hơn. 🧠',
   'Học tập không phải đích đến, đó là cuộc hành trình. 🌟',
+  'Hãy để sự tò mò dẫn lối, và sự kiên trì sẽ giúp bạn đến đích. 🚀',
+  'Mỗi khi bạn cảm thấy muốn bỏ cuộc, hãy nhớ lý do bạn bắt đầu. 🎯',
+  'Hôm nay là một trang giấy trắng, bạn sẽ viết nên câu chuyện gì? 📖',
+  'Thất bại là bài học quý giá nhất trên con đường dẫn đến thành công. 📚',
+  'Đầu tư vào kiến thức là khoản đầu tư sinh lời nhất. 💡',
+  'Hãy biến mỗi ngày học tập thành một cuộc phiêu lưu thú vị! 🗺️',
+  'Sự thông thái đến từ việc học hỏi không ngừng. 🎓',
+  'Mỗi cuốn sách mở ra một thế giới mới. 🏰',
 ]
 
 function getQuote() {
@@ -128,26 +136,26 @@ function TaskItem({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function DashboardPage() {
-  const navigate     = useNavigate()
-  const { user }     = useAuth()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const { subjects } = useSubjects()
   const { tasks, total: totalTasks, toggle, removeTask } = useTasks()
   const { weeklyData, todayTimeFormatted, totalWeeklyHours, refresh: refreshSessions } = useStudySessions()
-  const { profile }  = useProfile()
+  const { profile } = useProfile()
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
 
-  const today       = new Date()
-  const { events }  = useCalendarEvents(today.getFullYear(), today.getMonth())
+  const today = new Date()
+  const { events } = useCalendarEvents(today.getFullYear(), today.getMonth())
   const todayEvents = events.filter(e => {
     const d = new Date(e.start_time)
     return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
   }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
-  const displayName  = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'bạn'
+  const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'bạn'
   const pendingCount = tasks.filter(t => !t.completed).length
   const upcomingTasks = tasks.filter(t => !t.completed && t.due_date).slice(0, 4)
 
-  const hour     = today.getHours()
+  const hour = today.getHours()
   const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Xin chào' : 'Chào buổi tối'
 
   // Streak: count consecutive days with sessions (simplified from weeklyData)
@@ -185,7 +193,7 @@ export function DashboardPage() {
       label: 'Level', value: `Lv ${profile?.level ?? 1}`, icon: Zap,
       color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10',
       sub: `${(profile?.xp ?? 0).toLocaleString()} XP`,
-      onClick: () => {},
+      onClick: () => { },
     },
   ]
 
@@ -207,7 +215,7 @@ export function DashboardPage() {
               </span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-surface-900 dark:text-white mb-2">
-              {greeting}, <span className="bg-gradient-brand bg-clip-text text-transparent">{displayName}</span>! 👋
+              {greeting}, <span className="bg-gradient-brand bg-clip-text text-transparent">{displayName}</span>!
             </h2>
             <p className="text-sm text-surface-500 dark:text-surface-400 italic mb-4 max-w-md">
               "{getQuote()}"

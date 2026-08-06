@@ -6,7 +6,12 @@
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="8" fill="url(#g)"/>
-  <path d="M16 7 C12 7, 9 10, 9 14 C9 16.5, 10.2 18.7, 12.2 20 L11 25 L16 23 L21 25 L19.8 20 C21.8 18.7, 23 16.5, 23 14 C23 10, 20 7, 16 7Z" fill="white" stroke="none"/>
-  <circle cx="13.5" cy="13.5" r="1.5" fill="#6B4EFF"/>
-  <circle cx="18.5" cy="13.5" r="1.5" fill="#6B4EFF"/>
+  <g fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Mortarboard Diamond -->
+    <path d="M28 13.5L16 7L4 13.5L16 20L28 13.5z" />
+    <!-- Cap base -->
+    <path d="M8 17.5v5c0 2.2 3.6 4 8 4s8-1.8 8-4v-5" />
+    <!-- Tassel -->
+    <path d="M24 14.5v6" />
+  </g>
 </svg>

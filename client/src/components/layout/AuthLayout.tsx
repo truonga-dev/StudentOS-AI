@@ -4,11 +4,11 @@ import { GraduationCap, Sparkles, LayoutDashboard, BrainCircuit, CalendarCheck, 
 export function AuthLayout() {
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex font-sans overflow-hidden">
-      
+
       {/* Left panel — Premium Branding */}
       <div className="hidden lg:flex lg:w-[500px] xl:w-[600px] flex-col justify-between p-14
                       bg-[#0f172a] relative overflow-hidden">
-        
+
         {/* Animated Background Blobs */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute -top-[10%] -left-[10%] w-[500px] h-[500px] rounded-full 
@@ -38,7 +38,7 @@ export function AuthLayout() {
         <div className="relative z-10 space-y-8 mt-12 animate-slide-up">
           <h2 className="text-[2.75rem] font-extrabold text-transparent bg-clip-text 
                          bg-gradient-to-br from-white via-white to-white/60 leading-[1.15] tracking-tight">
-            Học tập thông minh,<br/> không tốn sức.
+            Học tập thông minh,<br /> không tốn sức.
           </h2>
           <p className="text-surface-300 text-lg leading-relaxed max-w-[420px] font-medium">
             Tất cả những gì bạn cần để chinh phục mọi học kỳ — deadline, tài liệu, flashcard, và một trợ lý AI đồng hành.
@@ -72,18 +72,18 @@ export function AuthLayout() {
                           overflow-hidden group hover:bg-white/[0.05] transition-colors duration-500">
             {/* Subtle inner glow */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            
+
             <p className="text-white/90 text-[15px] italic leading-relaxed relative z-10">
               "Student OS AI thực sự thay đổi cách mình học tập. Mình không còn bị trễ deadline, và việc ôn thi bằng Flashcard AI giúp điểm số cải thiện rõ rệt!"
             </p>
             <div className="mt-5 flex items-center gap-3 relative z-10">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-primary-600 
                               flex items-center justify-center text-white text-sm font-bold shadow-lg">
-                NM
+                TA
               </div>
               <div>
-                <p className="text-white font-semibold text-sm">Nguyễn Minh</p>
-                <p className="text-white/50 text-xs font-medium mt-0.5">Sinh viên xuất sắc — HUST</p>
+                <p className="text-white font-semibold text-sm">Truong A</p>
+                <p className="text-white/50 text-xs font-medium mt-0.5">Sinh viên Đại học Đông Á — UDA</p>
               </div>
             </div>
           </div>
@@ -95,7 +95,7 @@ export function AuthLayout() {
         {/* Subtle background pattern/gradient for right side in dark mode */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] 
                         from-primary-500/5 via-transparent to-transparent pointer-events-none dark:opacity-100 opacity-50" />
-        
+
         <div className="flex-1 flex items-center justify-center p-6 lg:p-12 relative z-10">
           <div className="w-full max-w-[420px] animate-scale-in">
             {/* Mobile logo header */}
