@@ -163,7 +163,7 @@ export function FocusSpacePage() {
   const navigate = useNavigate()
   const { subjects } = useSubjects()
   const { logSession } = useStudySessions()
-  const { addPoints, addXp } = useProfile()
+  const { recordActivity } = useProfile()
   const { tasks, toggle: toggleTask } = useTasks()
 
   // ── Timer state ──────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ export function FocusSpacePage() {
       toast.success('🎉 Hoàn thành Pomodoro! +' + focusMin * 2 + ' XP', { duration: 5000, position: 'top-center' })
       if (selectedSubject && sessionStart) {
         logSession({ subject_id: selectedSubject, duration_minutes: focusMin, started_at: sessionStart.toISOString(), ended_at: new Date().toISOString() })
-        addPoints(focusMin); addXp(focusMin * 2)
+        recordActivity(focusMin * 2, focusMin)
       }
     } else {
       setMode('idle'); setSecondsLeft(focusMin * 60)

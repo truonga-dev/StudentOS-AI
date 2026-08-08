@@ -17,14 +17,7 @@ interface MembersPanelProps {
   onMemberClick: (userId: string) => void
 }
 
-// Rank badge colors
-const RANK_COLORS: Record<string, string> = {
-  Bronze: 'bg-amber-500',
-  Silver: 'bg-slate-400',
-  Gold: 'bg-yellow-400',
-  Platinum: 'bg-teal-400',
-  Diamond: 'bg-cyan-400',
-}
+import { RANK_CONFIG } from '@/lib/ranks'
 
 export function MembersPanel({ channelId, userId, onMemberClick }: MembersPanelProps) {
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -104,7 +97,14 @@ export function MembersPanel({ channelId, userId, onMemberClick }: MembersPanelP
 
   const renderMember = (m: MemberProfile, isOnline: boolean) => {
     const isMe = m.id === userId
-    const rankColor = RANK_COLORS[m.rank_tier || 'Bronze'] || RANK_COLORS.Bronze
+    let dotStyle = {}
+    let dotClass = ''
+
+    if (isOnline) {
+      dotClass = 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+    } else {
+      dotStyle = { backgroundColor: RANK_CONFIG[m.rank_tier || 'Bronze']?.color || '#cd7f32' }
+    }
 
     return (
       <button
@@ -118,8 +118,8 @@ export function MembersPanel({ channelId, userId, onMemberClick }: MembersPanelP
             {m.avatar_url
               ? <img src={m.avatar_url} alt={m.full_name || ''} className={clsx('w-full h-full object-cover', !isOnline && 'opacity-50 grayscale')} />
               : <span className={clsx('text-sm font-bold text-primary-600 dark:text-primary-400', !isOnline && 'opacity-40')}>
-                  {m.full_name?.charAt(0) || '?'}
-                </span>
+                {m.full_name?.charAt(0) || '?'}
+              </span>
             }
           </div>
           {/* Online / offline dot */}
@@ -143,9 +143,9 @@ export function MembersPanel({ channelId, userId, onMemberClick }: MembersPanelP
             </span>
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', rankColor)} />
+            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', dotClass)} style={dotStyle} />
             <span className="text-[10px] text-surface-400">
-              {m.rank_tier || 'Bronze'} · Lv.{m.level || 1}
+              {RANK_CONFIG[m.rank_tier || 'Bronze']?.label || 'Đồng'} · Lv.{m.level || 1}
             </span>
           </div>
         </div>

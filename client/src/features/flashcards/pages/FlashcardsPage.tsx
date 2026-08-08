@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
-import { Plus, Search, BookOpen, Trash2, Brain, Loader2, PlayCircle, X, ChevronRight, ChevronLeft, Check, RotateCcw, Image as ImageIcon, Sparkles, Layers } from 'lucide-react'
+import { Plus, Search, Trash2, Loader2, PlayCircle, X, Image as ImageIcon, Sparkles, Layers, Calendar, Shuffle, Star } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useFlashcards } from '@/hooks/useFlashcards'
 import { useSubjects } from '@/hooks/useSubjects'
 import { generateFlashcardsFromImage, generateFlashcardsFromDocument } from '@/services/ai'
 import { uploadFlashcardImage } from '@/services/flashcards'
 import { useFiles } from '@/hooks/useFiles'
-import { calculateSM2 } from '@/utils/sm2'
 import { FileText, File as FileIcon, Presentation } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { FlashcardStudyMode, type StudyMode } from '../components/FlashcardStudyMode'
 
 export function FlashcardsPage() {
   const { flashcards, loading, addFlashcard, addMultipleFlashcards, editFlashcard, removeFlashcard } = useFlashcards()
@@ -35,10 +35,8 @@ export function FlashcardsPage() {
   
   // Study Mode state
   const [studyMode, setStudyMode] = useState(false)
-  const [studyCards, setStudyCards] = useState<typeof flashcards>([])
-  const [currentCardIndex, setCurrentCardIndex] = useState(0)
-  const [isFlipped, setIsFlipped] = useState(false)
-  const [studyStats, setStudyStats] = useState({ total: 0, memorized: 0, forgotten: 0 })
+  const [studyModeType, setStudyModeType] = useState<StudyMode>('due')
+  const [showModeSelector, setShowModeSelector] = useState(false)
 
   const filteredCards = flashcards.filter(c => 
     c.question.toLowerCase().includes(search.toLowerCase()) || 
@@ -98,71 +96,18 @@ export function FlashcardsPage() {
 
   // Tính toán thẻ đến hạn ôn tập
   const dueCards = flashcards.filter(card => {
-    if (!card.next_review_date) return true // Thẻ mới chưa học bao giờ
-    return new Date(card.next_review_date) <= new Date() // Thẻ đã đến hạn
+    if (!card.next_review_date) return true
+    return new Date(card.next_review_date) <= new Date()
   })
 
-  // Bắt đầu học
-  const startStudy = () => {
-    if (dueCards.length === 0) {
-      toast.success('Bạn đã học xong tất cả các thẻ đến hạn hôm nay! Tuyệt vời!', { icon: '🎉' })
+  const startStudy = (mode: StudyMode) => {
+    if (mode === 'due' && dueCards.length === 0) {
+      toast.success('Không có thẻ nào đến hạn hôm nay! 🎉', { icon: '🎉' })
       return
     }
-    setStudyCards([...dueCards].sort(() => Math.random() - 0.5)) // Shuffle
-    setCurrentCardIndex(0)
-    setIsFlipped(false)
-    setStudyStats({ total: flashcards.length, memorized: 0, forgotten: 0 })
+    setStudyModeType(mode)
+    setShowModeSelector(false)
     setStudyMode(true)
-  }
-
-  const handleStudyAction = async (quality: number) => {
-    const currentCard = studyCards[currentCardIndex]
-    
-    // Tính toán SM-2
-    const { newInterval, newRepetitions, newEaseFactor } = calculateSM2(
-      quality,
-      currentCard.repetition || 0,
-      currentCard.interval || 0,
-      currentCard.ease_factor || 2.5
-    )
-
-    // Tính ngày ôn tập tiếp theo
-    const nextReviewDate = new Date()
-    nextReviewDate.setDate(nextReviewDate.getDate() + newInterval)
-
-    const isMemorized = quality >= 3
-    
-    try {
-      await editFlashcard(currentCard.id, { 
-        is_memorized: isMemorized,
-        last_reviewed: new Date().toISOString(),
-        interval: newInterval,
-        repetition: newRepetitions,
-        ease_factor: newEaseFactor,
-        next_review_date: nextReviewDate.toISOString()
-      })
-      
-      setStudyStats(prev => ({
-        ...prev,
-        memorized: prev.memorized + (isMemorized ? 1 : 0),
-        forgotten: prev.forgotten + (isMemorized ? 0 : 1)
-      }))
-
-      // Nếu quality < 3 (chọn Lại từ đầu), nhét thẻ này vào cuối mảng để học lại trong phiên này
-      if (quality < 3) {
-        setStudyCards(prev => [...prev, currentCard])
-      }
-
-      if (currentCardIndex < studyCards.length - 1) {
-        setIsFlipped(false)
-        setCurrentCardIndex(prev => prev + 1)
-      } else {
-        toast.success('Đã hoàn thành phiên học!', { icon: '🎓' })
-        setStudyMode(false)
-      }
-    } catch (err) {
-      toast.error('Có lỗi xảy ra khi lưu trạng thái học')
-    }
   }
 
   // AI Generation
@@ -204,102 +149,15 @@ export function FlashcardsPage() {
     } catch (err) {}
   }
 
+  // Render fullscreen study mode
   if (studyMode) {
-    const card = studyCards[currentCardIndex]
-    if (!card) return null
-
     return (
-      <div className="max-w-2xl mx-auto min-h-[calc(100vh-160px)] sm:min-h-[calc(100vh-112px)] flex flex-col justify-between px-4 pt-8 pb-4 sm:py-8 animate-fade-in">
-        <div>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-white">Ôn tập Flashcards</h2>
-              <p className="text-surface-500 mt-0.5 text-xs sm:text-sm">
-                Thẻ {currentCardIndex + 1} / {studyCards.length}
-              </p>
-            </div>
-            <button 
-              onClick={() => setStudyMode(false)}
-              className="p-2 text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Progress bar */}
-          <div className="w-full bg-surface-100 dark:bg-surface-800 h-1.5 sm:h-2 rounded-full mb-6 sm:mb-8 overflow-hidden">
-            <div 
-              className="bg-primary-500 h-full transition-all duration-300"
-              style={{ width: `${((currentCardIndex) / studyCards.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Card 3D Flip */}
-          <div className="perspective-1000 w-full">
-            <div 
-              className={clsx(
-                "relative w-full h-[320px] sm:h-[420px] transition-transform duration-500 transform-style-3d cursor-pointer",
-                isFlipped ? "rotate-y-180" : ""
-              )}
-              onClick={() => setIsFlipped(!isFlipped)}
-            >
-              {/* Mặt trước */}
-              <div className="absolute inset-0 backface-hidden card bg-white dark:bg-surface-800 flex flex-col items-center justify-center p-6 sm:p-8 text-center shadow-xl border border-surface-200 dark:border-surface-700">
-                <span className="text-xs sm:text-sm font-semibold text-primary-500 uppercase tracking-widest mb-3 sm:mb-4">Câu hỏi</span>
-                {card?.image_url && (
-                  <img src={card.image_url} alt="Flashcard illustration" className="max-h-[100px] sm:max-h-[160px] object-contain rounded-lg mb-4" />
-                )}
-                <h3 className="text-lg sm:text-2xl font-bold text-surface-900 dark:text-white leading-relaxed line-clamp-4 px-2">
-                  {card?.question}
-                </h3>
-                <p className="absolute bottom-4 sm:bottom-6 text-surface-400 text-xs sm:text-sm flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 animate-pulse" /> Bấm để xem đáp án
-                </p>
-              </div>
-
-              {/* Mặt sau */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 card bg-primary-500 text-white flex flex-col items-center justify-center p-6 sm:p-8 text-center shadow-xl">
-                <span className="text-xs sm:text-sm font-semibold text-primary-200 uppercase tracking-widest mb-4 sm:mb-6">Đáp án</span>
-                <p className="text-lg sm:text-2xl font-medium leading-relaxed whitespace-pre-wrap px-2 overflow-y-auto max-h-[80%] custom-scrollbar">
-                  {card?.answer}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions (SM-2 Buttons) */}
-        <div className={clsx(
-          "mt-6 sm:mt-8 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 w-full max-w-lg mx-auto transition-all duration-300 pb-4",
-          isFlipped ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
-        )}>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleStudyAction(1); }}
-            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-danger-50 text-danger-600 hover:bg-danger-100 dark:bg-danger-500/10 dark:hover:bg-danger-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
-          >
-            Lại từ đầu (1m)
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleStudyAction(3); }}
-            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
-          >
-            Khó
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleStudyAction(4); }}
-            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-500/10 dark:hover:bg-primary-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
-          >
-            Tốt
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleStudyAction(5); }}
-            className="btn h-12 sm:h-14 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-success-50 text-success-600 hover:bg-success-100 dark:bg-success-500/10 dark:hover:bg-success-500/20 font-bold border-none text-xs sm:text-sm w-full sm:w-auto"
-          >
-            Dễ
-          </button>
-        </div>
-      </div>
+      <FlashcardStudyMode
+        cards={flashcards}
+        mode={studyModeType}
+        onClose={() => setStudyMode(false)}
+        onUpdateCard={async (id, updates) => { await editFlashcard(id, updates) }}
+      />
     )
   }
 
@@ -323,7 +181,7 @@ export function FlashcardsPage() {
           </div>
           <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
             <button
-              onClick={startStudy}
+              onClick={() => setShowModeSelector(true)}
               className="btn btn-secondary h-10 px-2 sm:px-4 whitespace-nowrap text-xs sm:text-sm flex items-center justify-center gap-1"
             >
               <PlayCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Học ({dueCards.length})
@@ -710,6 +568,69 @@ export function FlashcardsPage() {
                 className="btn bg-gradient-brand text-white shadow-glow-sm hover:shadow-glow disabled:opacity-50"
               >
                 Lưu {generatedCards.length} thẻ vào CSDL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Study Mode Selector Modal ── */}
+      {showModeSelector && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-surface-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="card w-full max-w-sm p-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-surface-900 dark:text-white">Chọn chế độ học</h2>
+              <button onClick={() => setShowModeSelector(false)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Due Today */}
+              <button
+                onClick={() => startStudy('due')}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-500/5 hover:bg-orange-100 dark:hover:bg-orange-500/10 transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-surface-900 dark:text-white text-sm">Đến hạn hôm nay</p>
+                  <p className="text-xs text-surface-500">{dueCards.length} thẻ cần ôn tập theo lịch</p>
+                </div>
+                <span className="ml-auto font-black text-orange-500 text-lg">{dueCards.length}</span>
+              </button>
+
+              {/* All cards */}
+              <button
+                onClick={() => startStudy('all')}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-primary-200 dark:border-primary-800/50 bg-primary-50 dark:bg-primary-500/5 hover:bg-primary-100 dark:hover:bg-primary-500/10 transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-500/20 flex items-center justify-center shrink-0">
+                  <Shuffle className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-surface-900 dark:text-white text-sm">Toàn bộ thẻ</p>
+                  <p className="text-xs text-surface-500">Ôn tập ngẫu nhiên tất cả flashcard</p>
+                </div>
+                <span className="ml-auto font-black text-primary-500 text-lg">{flashcards.length}</span>
+              </button>
+
+              {/* Starred / memorized */}
+              <button
+                onClick={() => startStudy('starred')}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-success-200 dark:border-success-800/50 bg-success-50 dark:bg-success-500/5 hover:bg-success-100 dark:hover:bg-success-500/10 transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-success-100 dark:bg-success-500/20 flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 text-success-600 dark:text-success-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-surface-900 dark:text-white text-sm">Đã thuộc</p>
+                  <p className="text-xs text-surface-500">Ôn lại các thẻ đã đánh dấu là thuộc</p>
+                </div>
+                <span className="ml-auto font-black text-success-500 text-lg">
+                  {flashcards.filter(c => c.is_memorized).length}
+                </span>
               </button>
             </div>
           </div>

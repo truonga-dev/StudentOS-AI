@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getProfile, addPointsAndUpdateStreak, updateProfile as apiUpdateProfile, uploadAvatar as apiUploadAvatar, addXp as apiAddXp } from '@/services/profiles'
+import { getProfile, recordActivity as apiRecordActivity, updateProfile as apiUpdateProfile, uploadAvatar as apiUploadAvatar } from '@/services/profiles'
 import type { Profile } from '@/types'
 import { supabase } from '@/lib/supabase'
 
@@ -36,7 +36,7 @@ export function useProfile() {
 
   const addPoints = async (points: number) => {
     try {
-      const p = await addPointsAndUpdateStreak(points)
+      const p = await apiRecordActivity({ pointsToAdd: points })
       setProfile(p)
     } catch (err) {
       console.error(err)
@@ -45,7 +45,16 @@ export function useProfile() {
 
   const addXp = async (xp: number) => {
     try {
-      const p = await apiAddXp(xp)
+      const p = await apiRecordActivity({ xpToAdd: xp })
+      setProfile(p)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const recordActivity = async (xpToAdd: number, pointsToAdd: number) => {
+    try {
+      const p = await apiRecordActivity({ xpToAdd, pointsToAdd })
       setProfile(p)
     } catch (err) {
       console.error(err)
@@ -70,6 +79,7 @@ export function useProfile() {
     loading,
     addPoints,
     addXp,
+    recordActivity,
     updateProfile,
     uploadAvatar,
     refreshProfile: loadProfile

@@ -12,28 +12,14 @@ interface ChatMembersModalProps {
   onMemberClick?: (userId: string) => void
 }
 
-const RANK_ICONS: Record<string, React.ElementType> = {
-  Bronze: ShieldAlert,
-  Silver: Shield,
-  Gold: Award,
-  Platinum: Star,
-  Diamond: Trophy,
-}
-
-const RANK_COLORS: Record<string, string> = {
-  Bronze: 'text-amber-600',
-  Silver: 'text-slate-400',
-  Gold: 'text-yellow-500',
-  Platinum: 'text-teal-400',
-  Diamond: 'text-cyan-400',
-}
+import { RANK_ICONS, RANK_COLORS, RANK_CONFIG } from '@/lib/ranks'
 
 export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMembersModalProps) {
   const { user } = useAuth()
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [myRole, setMyRole] = useState<'owner' | 'admin' | 'member'>('member')
-  
+
   const [isInviting, setIsInviting] = useState(false)
   const [friends, setFriends] = useState<any[]>([])
   const [loadingFriends, setLoadingFriends] = useState(false)
@@ -96,7 +82,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
         <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-surface-700">
           <div className="flex items-center gap-2">
             {isInviting && (
-              <button 
+              <button
                 onClick={() => setIsInviting(false)}
                 className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors mr-1"
               >
@@ -138,7 +124,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
                     {isAlreadyMember ? (
                       <span className="text-xs text-surface-400 font-medium px-2">Đã tham gia</span>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => handleAddMember(friend.id)}
                         className="btn btn-primary px-3 py-1.5 text-xs"
                       >
@@ -153,7 +139,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {(myRole === 'owner' || myRole === 'admin') && (
-              <button 
+              <button
                 onClick={() => { setIsInviting(true); loadFriends() }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary-200 dark:border-primary-900 text-primary-600 dark:text-primary-400 font-semibold hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors mb-4"
               >
@@ -175,7 +161,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
                 return (
                   <div key={member.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className="w-10 h-10 rounded-full bg-surface-200 dark:bg-surface-700 shrink-0 overflow-hidden relative cursor-pointer"
                         onClick={() => onMemberClick?.(member.user_id)}
                       >
@@ -189,7 +175,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="font-semibold text-sm cursor-pointer hover:underline"
                             onClick={() => onMemberClick?.(member.user_id)}
                           >
@@ -200,13 +186,13 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-surface-500 mt-0.5">
                           <RankIcon className={clsx("w-3.5 h-3.5", rankColor)} />
-                          <span>Lv.{member.profile?.level || 1} • {member.profile?.rank_tier || 'Bronze'}</span>
+                          <span>Lv.{member.profile?.level || 1} • {RANK_CONFIG[member.profile?.rank_tier || 'Bronze']?.label || 'Đồng'}</span>
                         </div>
                       </div>
                     </div>
-                    
+
                     {(myRole === 'owner' || (myRole === 'admin' && member.role === 'member')) && member.user_id !== user?.id && (
-                      <button 
+                      <button
                         onClick={() => handleKick(member.user_id)}
                         className="p-2 text-surface-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-500/10 rounded-lg transition-colors"
                         title="Kick thành viên"

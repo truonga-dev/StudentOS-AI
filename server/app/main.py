@@ -4,6 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import subjects, tasks, notes, ai, files, gpa
 
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from app.core.limiter import limiter
+from app.core.cache import init_cache
+
 app = FastAPI(
     title="Student OS AI — Backend API",
     description="REST API cho Student OS AI. Xác thực qua Supabase JWT.",
@@ -12,6 +17,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.on_event("startup")
+async def startup():
+    init_cache()
+
 # ── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -19,8 +31,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         *settings.origins_list
-    ],
-    allow_credentials=True,
+    ] if "*" not in settings.origins_list else ["*"],
+    allow_credentials=True if "*" not in settings.origins_list else False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

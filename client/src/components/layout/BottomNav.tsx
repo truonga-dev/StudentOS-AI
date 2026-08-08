@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, FileText, CheckSquare, BrainCircuit, Users } from 'lucide-react'
+import { LayoutDashboard, FileText, CheckSquare, BrainCircuit, Trophy } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -7,11 +7,11 @@ export function BottomNav() {
   const { t } = useLanguage()
 
   const NAV_ITEMS = [
-    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
-    { to: '/notes',     icon: FileText,        label: t('nav.notes') },
-    { to: '/tasks',     icon: CheckSquare,     label: t('nav.tasks') },
-    { to: '/flashcards', icon: BrainCircuit,   label: t('nav.flashcards') },
-    { to: '/community', icon: Users,           label: t('nav.community') },
+    { to: '/dashboard',   icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/notes',       icon: FileText,        label: t('nav.notes') },
+    { to: '/leaderboard', icon: Trophy,          label: 'Xếp hạng' },
+    { to: '/tasks',       icon: CheckSquare,     label: t('nav.tasks') },
+    { to: '/flashcards',  icon: BrainCircuit,    label: t('nav.flashcards') },
   ]
 
   return (

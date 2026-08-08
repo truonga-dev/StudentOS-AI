@@ -9,3 +9,5 @@ python-dotenv==1.0.1
 python-multipart==0.0.18
 google-generativeai==0.8.3
 groq
+slowapi
+fastapi-cache2

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BookOpen, CheckSquare, Clock, Target, Zap,
   Flame, ArrowRight, Check, Trash2, MoreHorizontal,
@@ -20,6 +20,7 @@ import { SubjectProgressCard } from '@/features/dashboard/components/SubjectProg
 import { MindMapWidget } from '@/features/dashboard/components/MindMapWidget'
 import { PomodoroTimer } from '@/features/dashboard/components/PomodoroTimer'
 import { AIWeeklyReport } from '@/features/dashboard/components/AIWeeklyReport'
+import { OnboardingTour } from '@/components/layout/OnboardingTour'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_COLORS: Record<string, string> = {
@@ -141,8 +142,37 @@ export function DashboardPage() {
   const { subjects } = useSubjects()
   const { tasks, total: totalTasks, toggle, removeTask } = useTasks()
   const { weeklyData, todayTimeFormatted, totalWeeklyHours, refresh: refreshSessions } = useStudySessions()
-  const { profile } = useProfile()
+  const { profile, addXp, updateProfile } = useProfile()
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  const [showTour, setShowTour] = useState(false)
+
+  // Auto-show tour for first-time users once profile has loaded
+  useEffect(() => {
+    if (profile && profile.has_completed_onboarding === false) {
+      // Small delay so dashboard finishes rendering before tour starts
+      const t = setTimeout(() => setShowTour(true), 600)
+      return () => clearTimeout(t)
+    }
+  }, [profile])
+
+  const handleTourComplete = async () => {
+    setShowTour(false)
+    try {
+      await addXp(50)
+      await updateProfile({ has_completed_onboarding: true })
+    } catch (e) {
+      console.error('Tour complete error:', e)
+    }
+  }
+
+  const handleTourSkip = async () => {
+    setShowTour(false)
+    try {
+      await updateProfile({ has_completed_onboarding: true })
+    } catch (e) {
+      console.error('Tour skip error:', e)
+    }
+  }
 
   const today = new Date()
   const { events } = useCalendarEvents(today.getFullYear(), today.getMonth())
@@ -239,7 +269,7 @@ export function DashboardPage() {
           </div>
 
           {/* Right: profile card */}
-          <div className="w-full md:w-80 shrink-0">
+          <div id="hero-profile-card" className="w-full md:w-80 shrink-0">
             <HeroProfileCard
               level={profile?.level ?? 1}
               xp={profile?.xp ?? 0}
@@ -259,7 +289,7 @@ export function DashboardPage() {
 
       {/* ── MAIN BENTO GRID ROW 1: Chart + Streak ───────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <div className="xl:col-span-3">
+        <div id="study-hours-chart" className="xl:col-span-3">
           <StudyHoursChart weeklyData={weeklyData} totalWeeklyHours={totalWeeklyHours} />
         </div>
         <div className="xl:col-span-2">
@@ -269,7 +299,9 @@ export function DashboardPage() {
 
       {/* ── BENTO ROW 2: Timeline + Subjects + Pomodoro ─────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <TodayTimeline events={todayEvents} />
+        <div id="today-timeline-card">
+          <TodayTimeline events={todayEvents} />
+        </div>
         <SubjectProgressCard subjects={subjects} tasks={tasks} />
         <div id="pomodoro-timer">
           <PomodoroTimer onSessionLogged={refreshSessions} />
@@ -288,7 +320,7 @@ export function DashboardPage() {
         <div className="xl:col-span-2 space-y-6">
 
           {/* Upcoming tasks */}
-          <div className="card p-5">
+          <div id="upcoming-tasks-card" className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="section-title text-base">Công việc sắp tới</h3>
@@ -327,9 +359,19 @@ export function DashboardPage() {
           </div>
 
           {/* AI Weekly Report */}
-          <AIWeeklyReport />
+          <div id="ai-weekly-report">
+            <AIWeeklyReport />
+          </div>
         </div>
       </div>
+
+      {/* ── ONBOARDING TOUR ──────────────────────────────────────────────── */}
+      {showTour && (
+        <OnboardingTour
+          onComplete={handleTourComplete}
+          onSkip={handleTourSkip}
+        />
+      )}
     </div>
   )
 }

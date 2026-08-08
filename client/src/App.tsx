@@ -27,6 +27,7 @@ import { MockTestPage } from '@/features/mocktests/pages/MockTestPage'
 import { CommunityChatPage } from '@/features/community/pages/CommunityChatPage'
 import { SharedSubjectPage } from '@/features/community/pages/SharedSubjectPage'
 import { NotFoundPage } from '@/features/errors/NotFoundPage'
+import { LeaderboardPage } from '@/features/leaderboard/pages/LeaderboardPage'
 
 // ─── Guards ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ export default function App() {
           <Route path="/community" element={<CommunityChatPage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
           <Route path="/mocktests" element={<MockTestPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
         </Route>
 
         {/* Shared Routes */}

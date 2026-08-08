@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import Request
+from app.core.limiter import limiter
+from fastapi_cache.decorator import cache
+
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.core.auth import get_user_id
 from app.core.supabase_client import get_supabase, get_user_supabase
@@ -73,6 +77,54 @@ async def generate_text_with_fallback(prompt: str) -> str:
                 raise HTTPException(status_code=429, detail="AI đang quá tải (Gemini). Groq dự phòng chưa được cấu hình. Vui lòng thử lại sau.")
             raise HTTPException(status_code=500, detail=f"Lỗi kết nối AI (Gemini): {error_msg}")
 
+
+import json
+
+class FlashcardSchema(BaseModel):
+    question: str
+    answer: str
+
+class FlashcardListSchema(BaseModel):
+    flashcards: list[FlashcardSchema]
+
+class QuizOptionSchema(BaseModel):
+    question: str
+    options: list[str]
+    correct_index: int
+    explanation: str
+
+class QuizListSchema(BaseModel):
+    quiz: list[QuizOptionSchema]
+
+class MockTestMultipleChoiceSchema(BaseModel):
+    question: str
+    options: list[str]
+    correct_answer: int
+
+class MockTestSchema(BaseModel):
+    multiple_choice: list[MockTestMultipleChoiceSchema]
+    essay: list[str]
+
+class GradeEssaySchema(BaseModel):
+    score: float
+    feedback: str
+
+async def generate_json_with_fallback(prompt: str, schema: type[BaseModel]) -> dict:
+    if not model:
+        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=schema
+            )
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Gemini Structured Output Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi AI xử lý JSON: {e}")
+
 import re
 
 def extract_json_from_text(text: str) -> str:
@@ -113,7 +165,9 @@ def extract_json_from_text(text: str) -> str:
     return text
 
 @router.post("/summarize")
-async def summarize_text(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def summarize_text(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -125,6 +179,8 @@ async def summarize_text(
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
+    if len(text) > 5000:
+        raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
     prompt = f"""
     Bạn là một trợ lý học tập AI xuất sắc. 
@@ -146,7 +202,9 @@ async def summarize_text(
 
 
 @router.post("/suggest-tasks")
-async def suggest_tasks(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def suggest_tasks(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -158,6 +216,8 @@ async def suggest_tasks(
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
+    if len(text) > 5000:
+        raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
     prompt = f"""
     Dựa vào ghi chú bài học dưới đây, hãy đề xuất 3-5 hành động/bài tập (to-do list) cụ thể 
@@ -178,7 +238,9 @@ async def suggest_tasks(
 
 
 @router.post("/generate-mindmap")
-async def generate_mindmap_endpoint(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def generate_mindmap_endpoint(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -190,6 +252,8 @@ async def generate_mindmap_endpoint(
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
+    if len(text) > 5000:
+        raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
     prompt = f"""
     Dựa vào ghi chú bài học dưới đây, hãy tạo ra một biểu đồ sơ đồ tư duy (mindmap) bằng cú pháp MermaidJS.
@@ -240,7 +304,9 @@ async def generate_mindmap_endpoint(
 
 
 @router.post("/generate-flashcards-from-text")
-async def generate_flashcards_from_text_endpoint(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def generate_flashcards_from_text_endpoint(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -273,24 +339,17 @@ async def generate_flashcards_from_text_endpoint(
     """
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
-        
-        import json
-        clean_text = extract_json_from_text(text_res)
-        try:
-            flashcards_data = json.loads(clean_text)
-            return {"flashcards": flashcards_data}
-        except json.JSONDecodeError:
-            print("Failed to parse JSON from AI:", clean_text)
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
-            
+        data = await generate_json_with_fallback(prompt, FlashcardListSchema)
+        return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi phân tích: {str(e)}")
 
 @router.post("/generate-quiz")
-async def generate_quiz_endpoint(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def generate_quiz_endpoint(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -327,24 +386,17 @@ async def generate_quiz_endpoint(
     """
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
-        
-        import json
-        clean_text = extract_json_from_text(text_res)
-        try:
-            quiz_data = json.loads(clean_text)
-            return {"quiz": quiz_data}
-        except json.JSONDecodeError:
-            print("Failed to parse JSON from AI:", clean_text)
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
-            
+        data = await generate_json_with_fallback(prompt, QuizListSchema)
+        return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý AI: {str(e)}")
 
 @router.post("/breakdown-task")
-async def breakdown_task(
+@limiter.limit('10/minute')
+@cache(expire=3600)
+async def breakdown_task(request: Request, 
     text: str = Body(..., embed=True),
     user_id: str = Depends(get_user_id)
 ):
@@ -356,6 +408,8 @@ async def breakdown_task(
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
+    if len(text) > 5000:
+        raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
     prompt = f"""
     Bạn là một chuyên gia quản lý thời gian và năng suất.
@@ -386,7 +440,8 @@ class ChatRequest(BaseModel):
     model_provider: str = "gemini"  # "gemini" | "groq"
 
 @router.post("/chat")
-async def chat_with_ai(
+@limiter.limit('10/minute')
+async def chat_with_ai(request: Request, 
     req: ChatRequest,
     user_id: str = Depends(get_user_id)
 ):
@@ -481,7 +536,8 @@ class GenerateFlashcardsRequest(BaseModel):
     mime_type: str = "image/jpeg"
 
 @router.post("/generate-flashcards")
-async def generate_flashcards(
+@limiter.limit('10/minute')
+async def generate_flashcards(request: Request, 
     req: GenerateFlashcardsRequest,
     user_id: str = Depends(get_user_id)
 ):
@@ -493,6 +549,9 @@ async def generate_flashcards(
 
     if not req.image_base64:
         raise HTTPException(status_code=400, detail="Thiếu dữ liệu ảnh")
+    
+    if len(req.image_base64) > 7 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Kích thước ảnh quá lớn (tối đa ~5MB)")
 
     # Loại bỏ prefix data:image/...;base64, nếu frontend có gửi lên
     base64_data = req.image_base64
@@ -528,17 +587,14 @@ async def generate_flashcards(
                 "mime_type": req.mime_type,
                 "data": decoded_data
             }
-        ])
+        ], generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            response_schema=FlashcardListSchema
+        ))
         
-        clean_text = extract_json_from_text(response.text)
         import json
-        
-        try:
-            flashcards_data = json.loads(clean_text.strip())
-            return {"flashcards": flashcards_data}
-        except json.JSONDecodeError:
-            print("Failed to parse JSON from AI:", clean_text)
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
+        flashcards_data = json.loads(response.text)
+        return flashcards_data
             
     except HTTPException:
         raise
@@ -553,7 +609,8 @@ class GenerateFlashcardsFromDocumentRequest(BaseModel):
     file_names: List[str]
 
 @router.post("/generate-flashcards-from-document")
-async def generate_flashcards_from_document(
+@limiter.limit('10/minute')
+async def generate_flashcards_from_document(request: Request, 
     req: GenerateFlashcardsFromDocumentRequest,
     user_id: str = Depends(get_user_id),
     sb: Client = Depends(get_user_supabase)
@@ -597,17 +654,8 @@ async def generate_flashcards_from_document(
     """
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
-        
-        clean_text = extract_json_from_text(text_res)
-        import json
-        try:
-            flashcards_data = json.loads(clean_text.strip())
-            return {"flashcards": flashcards_data}
-        except json.JSONDecodeError:
-            print("Failed to parse JSON from AI:", clean_text)
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
-            
+        data = await generate_json_with_fallback(prompt, FlashcardListSchema)
+        return data
     except HTTPException:
         raise
     except Exception as e:
@@ -618,7 +666,8 @@ class WeeklyReportRequest(BaseModel):
     week_end: str
 
 @router.post("/generate-weekly-report")
-async def generate_weekly_report(
+@limiter.limit('10/minute')
+async def generate_weekly_report(request: Request, 
     req: WeeklyReportRequest,
     user_id: str = Depends(get_user_id),
     sb: Client = Depends(get_user_supabase)
@@ -673,7 +722,8 @@ async def generate_weekly_report(
         raise HTTPException(status_code=500, detail=f"Lỗi tạo báo cáo: {str(e)}")
 
 @router.get("/weekly-reports")
-async def get_weekly_reports(user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
+@limiter.limit('10/minute')
+async def get_weekly_reports(request: Request, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
     res = sb.table("ai_reports").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
     return res.data
 
@@ -683,7 +733,8 @@ class GenerateMockTestRequest(BaseModel):
     num_essay: int = 1
 
 @router.post("/generate-mock-test")
-async def generate_mock_test(
+@limiter.limit('10/minute')
+async def generate_mock_test(request: Request, 
     req: GenerateMockTestRequest,
     user_id: str = Depends(get_user_id)
 ):
@@ -713,14 +764,8 @@ async def generate_mock_test(
     """
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
-        clean_text = extract_json_from_text(text_res)
-        import json
-        try:
-            test_data = json.loads(clean_text.strip())
-            return test_data
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
+        data = await generate_json_with_fallback(prompt, MockTestSchema)
+        return data
     except HTTPException:
         raise
     except Exception as e:
@@ -731,7 +776,8 @@ class GradeEssayRequest(BaseModel):
     student_answer: str
 
 @router.post("/grade-essay")
-async def grade_essay(
+@limiter.limit('10/minute')
+async def grade_essay(request: Request, 
     req: GradeEssayRequest,
     user_id: str = Depends(get_user_id)
 ):
@@ -752,14 +798,8 @@ async def grade_essay(
     """
     
     try:
-        text_res = await generate_text_with_fallback(prompt)
-        clean_text = extract_json_from_text(text_res)
-        import json
-        try:
-            grade_data = json.loads(clean_text.strip())
-            return grade_data
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=500, detail="AI trả về sai định dạng JSON. Vui lòng thử lại.")
+        data = await generate_json_with_fallback(prompt, GradeEssaySchema)
+        return data
     except HTTPException:
         raise
     except Exception as e:

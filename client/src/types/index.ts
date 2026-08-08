@@ -14,6 +14,20 @@ export interface Profile {
   rank_tier?: string
   bio?: string | null
   cover_url?: string | null
+  has_completed_onboarding?: boolean
+  // Extended profile
+  github_url?: string | null
+  linkedin_url?: string | null
+  school?: string | null
+  major?: string | null
+  study_year?: number | null
+  target_gpa?: number | null
+  // Study preferences (stored as JSON in profile or separate columns)
+  pref_pomodoro_work?: number | null      // minutes, default 25
+  pref_pomodoro_break?: number | null     // minutes, default 5
+  pref_daily_goal_hours?: number | null   // default 2
+  pref_weekly_goal_days?: number | null   // default 5
+  pref_accent_color?: string | null       // hex color
 }
 
 export interface Subject {
@@ -248,11 +262,11 @@ export interface Flashcard {
 export type CreateFlashcardInput = Pick<Flashcard, 'question' | 'answer'> & { subject_id?: string | null; image_url?: string | null }
 export type UpdateFlashcardInput = Partial<CreateFlashcardInput> & { 
   is_memorized?: boolean; 
-  last_reviewed?: string;
+  last_reviewed?: string | null;
   interval?: number;
   repetition?: number;
   ease_factor?: number;
-  next_review_date?: string;
+  next_review_date?: string | null;
 }
 
 // ─── Weekly chart data ────────────────────────────────────────────────────────

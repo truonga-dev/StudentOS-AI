@@ -52,7 +52,7 @@ export function PomodoroTimer({ onSessionLogged }: { onSessionLogged?: () => voi
   const navigate = useNavigate()
   const { subjects } = useSubjects()
   const { logSession } = useStudySessions()
-  const { addPoints, addXp } = useProfile()
+  const { recordActivity } = useProfile()
 
   const [mode, setMode]                     = useState<TimerMode>('idle')
   const [secondsLeft, setSecondsLeft]       = useState(FOCUS_MINUTES * 60)
@@ -98,7 +98,7 @@ export function PomodoroTimer({ onSessionLogged }: { onSessionLogged?: () => voi
       const started = sessionStarted ?? new Date(Date.now() - FOCUS_MINUTES * 60 * 1000)
       logSession({ subject_id: selectedSubjectId, duration_minutes: FOCUS_MINUTES, started_at: started.toISOString(), ended_at: new Date().toISOString() })
         .then(() => onSessionLogged?.())
-      addPoints(10); addXp(25)
+      recordActivity(25, 10)
       toast.success('🔥 +25 XP! Hoàn thành 1 Pomodoro!', { icon: '🍅' })
       setPomoCount(c => c + 1); setMode('done')
     } else {

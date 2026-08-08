@@ -12,21 +12,7 @@ interface UserProfileModalProps {
   onDirectMessage?: (userId: string, userName: string) => void
 }
 
-const RANK_ICONS: Record<string, React.ElementType> = {
-  Bronze: ShieldAlert,
-  Silver: Shield,
-  Gold: Award,
-  Platinum: Star,
-  Diamond: Trophy,
-}
-
-const RANK_COLORS: Record<string, string> = {
-  Bronze: 'text-amber-600',
-  Silver: 'text-slate-400',
-  Gold: 'text-yellow-500',
-  Platinum: 'text-teal-400',
-  Diamond: 'text-cyan-400',
-}
+import { RANK_ICONS, RANK_COLORS, RANK_CONFIG } from '@/lib/ranks'
 
 export function UserProfileModal({ userId, onClose, onDirectMessage }: UserProfileModalProps) {
   const { user } = useAuth()
@@ -211,7 +197,7 @@ export function UserProfileModal({ userId, onClose, onDirectMessage }: UserProfi
             <div className="flex items-center gap-3 mt-2">
               <div className={clsx("flex items-center gap-1 text-sm font-semibold", rankColor)}>
                 <RankIcon className="w-4 h-4" />
-                {profile.rank_tier}
+                {RANK_CONFIG[profile.rank_tier || 'Bronze']?.label || 'Đồng'}
               </div>
               <div className="text-sm font-medium text-surface-500">
                 Level {profile.level}

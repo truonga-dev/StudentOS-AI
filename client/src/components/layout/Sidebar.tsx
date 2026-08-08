@@ -43,6 +43,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onCloseMobile
     { to: '/files',     icon: FolderOpen,      label: t('nav.files') },
     { to: '/flashcards', icon: BrainCircuit,   label: t('nav.flashcards') },
     { to: '/mocktests',  icon: PenTool,        label: 'Thi thử' },
+    { to: '/leaderboard', icon: Trophy,        label: 'Xếp hạng' },
     { to: '/chat',      icon: Bot,             label: t('nav.chat') },
     { to: '/community', icon: Users,           label: t('nav.community') },
     { to: '/analytics', icon: BarChart3,       label: t('nav.analytics') },
