@@ -8,10 +8,7 @@ build/
 .next/
 out/
 
-# Package manager
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+
 
 # Logs
 logs/
