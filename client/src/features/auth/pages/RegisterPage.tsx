@@ -159,7 +159,7 @@ export function RegisterPage() {
             <button
               type="button"
               onClick={() => setShowPassword(s => !s)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
               aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

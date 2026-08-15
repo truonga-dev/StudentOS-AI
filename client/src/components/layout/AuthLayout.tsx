@@ -3,7 +3,7 @@ import { GraduationCap, Sparkles, LayoutDashboard, BrainCircuit, CalendarCheck, 
 
 export function AuthLayout() {
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex font-sans overflow-hidden">
+    <main className="min-h-screen bg-surface-50 dark:bg-surface-950 flex font-sans overflow-hidden">
 
       {/* Left panel — Premium Branding */}
       <div className="hidden lg:flex lg:w-[500px] xl:w-[600px] flex-col justify-between p-14
@@ -117,6 +117,6 @@ export function AuthLayout() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
