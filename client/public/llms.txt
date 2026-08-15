@@ -1,0 +1,5 @@
+# Student OS AI
+
+Nền tảng quản lý học tập tích hợp AI dành cho sinh viên.
+
+[Trang chủ](https://student-os-ai-navy.vercel.app/)
