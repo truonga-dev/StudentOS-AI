@@ -312,7 +312,7 @@ export function NotesPage() {
     setAiLoading(true)
     try {
       // clean content
-      let text = editContent.replace(/<[^>]*>?/gm, ''); // basic HTML strip
+      const text = editContent.replace(/<[^>]*>?/gm, ''); // basic HTML strip
       const cards = await generateFlashcardsFromText(text)
       setAiResult({ type: 'flashcards', content: cards })
     } catch (err: any) {
@@ -328,7 +328,7 @@ export function NotesPage() {
     }
     setAiLoading(true)
     try {
-      let text = editContent.replace(/<[^>]*>?/gm, '');
+      const text = editContent.replace(/<[^>]*>?/gm, '');
       const quiz = await generateQuiz(text)
       setAiResult({ type: 'quiz', content: quiz })
       setQuizAnswers({})
@@ -346,7 +346,7 @@ export function NotesPage() {
     }
     setAiLoading(true)
     try {
-      let text = editContent.replace(/<[^>]*>?/gm, '');
+      const text = editContent.replace(/<[^>]*>?/gm, '');
       const map = await generateMindmap(text)
       setAiResult({ type: 'mindmap', content: map })
       toast.success('Đã vẽ sơ đồ tư duy thành công')
@@ -782,8 +782,8 @@ export function NotesPage() {
                               onClick={async () => {
                                 const lines = aiResult.content.split('\n')
                                 const taskTitles = lines
-                                  .filter((l: string) => l.trim().match(/^[*\-]\s|^[0-9]+\.\s/))
-                                  .map((l: string) => l.replace(/^[*\-]\s|^[0-9]+\.\s/, '').replace(/^\[[ x]\]\s/, '').replace(/\*\*/g, '').trim())
+                                  .filter((l: string) => l.trim().match(/^[*-]\s|^[0-9]+\.\s/))
+                                  .map((l: string) => l.replace(/^[*-]\s|^[0-9]+\.\s/, '').replace(/^\[[ x]\]\s/, '').replace(/\*\*/g, '').trim())
                                   .filter(Boolean)
                                 
                                 if (taskTitles.length === 0) {

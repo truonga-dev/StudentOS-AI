@@ -5,9 +5,19 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
+import * as Sentry from '@sentry/react'
 import App from './App'
 import './index.css'
 
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+  })
+}
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

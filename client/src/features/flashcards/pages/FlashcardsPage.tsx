@@ -146,7 +146,7 @@ export function FlashcardsPage() {
       )
       setIsAiModalOpen(false)
       setGeneratedCards([])
-    } catch (err) {}
+    } catch (err) { /* ignore */ }
   }
 
   // Render fullscreen study mode

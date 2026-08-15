@@ -257,7 +257,7 @@ export function FocusSpacePage() {
         g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d)
         o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d)
       })
-    } catch {}
+    } catch (e) { /* ignore */ }
   }, [])
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current) }, [])
