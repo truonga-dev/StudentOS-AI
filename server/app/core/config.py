@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:5173"
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    redis_url: str = ""
+    sentry_dsn: str = ""
 
     @property
     def origins_list(self) -> list[str]:

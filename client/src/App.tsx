@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/useProfile'
 
 import { lazy, Suspense } from 'react'
 
@@ -29,6 +30,27 @@ const CommunityChatPage = lazy(() => import('@/features/community/pages/Communit
 const SharedSubjectPage = lazy(() => import('@/features/community/pages/SharedSubjectPage').then(m => ({ default: m.SharedSubjectPage })))
 const NotFoundPage = lazy(() => import('@/features/errors/NotFoundPage').then(m => ({ default: m.NotFoundPage })))
 const LeaderboardPage = lazy(() => import('@/features/leaderboard/pages/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })))
+// Admin standalone pages
+const AdminLayout = lazy(() => import('@/admin/layout/AdminLayout').then(m => ({ default: m.AdminLayout })))
+const AdminLoginPage = lazy(() => import('@/admin/pages/AdminLoginPage').then(m => ({ default: m.AdminLoginPage })))
+const AdminDashboardPage = lazy(() => import('@/admin/pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })))
+const AdminUsersPage = lazy(() => import('@/admin/pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })))
+const AdminReportsPage = lazy(() => import('@/admin/pages/AdminReportsPage').then(m => ({ default: m.AdminReportsPage })))
+const AdminCommunityPage = lazy(() => import('@/admin/pages/AdminCommunityPage').then(m => ({ default: m.AdminCommunityPage })))
+const AdminContentPage = lazy(() => import('@/admin/pages/AdminContentPage').then(m => ({ default: m.AdminContentPage })))
+const AdminBroadcastPage = lazy(() => import('@/admin/pages/AdminBroadcastPage').then(m => ({ default: m.AdminBroadcastPage })))
+const AdminAuditLogsPage = lazy(() => import('@/admin/pages/AdminAuditLogsPage').then(m => ({ default: m.AdminAuditLogsPage })))
+const AdminSettingsPage = lazy(() => import('@/admin/pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })))
+import { AdminAuthProvider } from '@/admin/context/AdminAuthContext'
+import { Outlet } from 'react-router-dom'
+
+function AdminRoot() {
+  return (
+    <AdminAuthProvider>
+      <Outlet />
+    </AdminAuthProvider>
+  )
+}
 
 // ─── Guards ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +129,21 @@ export default function App() {
             <Route path="/flashcards" element={<FlashcardsPage />} />
             <Route path="/mocktests" element={<MockTestPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+          </Route>
+
+          {/* ─── Standalone Admin Portal (Độc lập hoàn toàn) ─── */}
+          <Route path="/admin" element={<AdminRoot />}>
+            <Route path="login" element={<AdminLoginPage />} />
+            <Route element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="reports" element={<AdminReportsPage />} />
+              <Route path="community" element={<AdminCommunityPage />} />
+              <Route path="content" element={<AdminContentPage />} />
+              <Route path="broadcast" element={<AdminBroadcastPage />} />
+              <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+            </Route>
           </Route>
 
           {/* Shared Routes */}

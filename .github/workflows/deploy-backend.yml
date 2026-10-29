@@ -1,0 +1,27 @@
+name: Deploy Backend to Render
+
+on:
+  workflow_run:
+    workflows: ["Student OS AI CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Chỉ deploy nếu quá trình kiểm tra lỗi (CI) thành công
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Trigger Render Deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "Lỗi: Bạn chưa cài đặt biến bí mật RENDER_DEPLOY_HOOK trên GitHub."
+            exit 1
+          fi
+          echo "Đang kích hoạt Deploy trên Render..."
+          curl -X POST "$RENDER_DEPLOY_HOOK"
+          echo "Đã gửi tín hiệu Deploy thành công!"

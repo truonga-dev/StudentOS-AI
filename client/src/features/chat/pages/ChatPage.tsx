@@ -5,10 +5,11 @@ import { useAiChat } from '@/hooks/useAiChat'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { getChatMessages, createChatMessage } from '@/services/aiChat'
-import { chatWithAIStream } from '@/services/ai'
+import { chatWithAIStream, AI_PROMPTS_CONFIG } from '@/services/ai'
 import type { AiChat, AiChatMessage } from '@/types'
 import toast from 'react-hot-toast'
 import { MarkdownMessage } from '@/components/ui/MarkdownMessage'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export function ChatPage() {
   const { chats, loadingChats, addChat, removeChat, renameChat } = useAiChat()
@@ -26,6 +27,7 @@ export function ChatPage() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [selectedModelProvider, setSelectedModelProvider] = useState<'gemini' | 'groq' | 'groq-deepseek'>('gemini')
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -369,7 +371,7 @@ export function ChatPage() {
                       <button
                         onClick={e => {
                           e.stopPropagation()
-                          if (confirm('Xóa đoạn chat này?')) removeChat(chat.id)
+                          setChatToDelete(chat.id)
                         }}
                         className="p-1.5 rounded-md text-surface-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-500/10 transition-all"
                         title="Xóa"
@@ -399,10 +401,37 @@ export function ChatPage() {
               {loadingMessages ? (
                 <div className="flex justify-center p-4"><Loader2 className="w-8 h-8 animate-spin text-surface-400" /></div>
               ) : messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-surface-400 gap-3">
+                <div className="h-full flex flex-col items-center justify-center text-surface-400 gap-4 px-4">
                   <Sparkles className="w-12 h-12 text-primary-500/50" />
-                  <p className="font-medium text-surface-600 dark:text-surface-300">Bắt đầu trò chuyện với Trợ lý AI</p>
-                  <p className="text-sm max-w-sm text-center">Bạn có thể hỏi về bài học, nhờ giải thích khái niệm, hoặc tóm tắt tài liệu.</p>
+                  <div className="text-center space-y-1">
+                    <p className="font-semibold text-base text-surface-700 dark:text-surface-200">
+                      {AI_PROMPTS_CONFIG.system_persona.name} — {AI_PROMPTS_CONFIG.system_persona.role}
+                    </p>
+                    <p className="text-sm max-w-md mx-auto">
+                      Bạn có thể hỏi về bài học, nhờ giải thích khái niệm, lập kế hoạch ôn thi hoặc chọn nhanh gợi ý bên dưới:
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-2xl w-full mt-2">
+                    {AI_PROMPTS_CONFIG.suggested_prompts.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setInputValue(item.prompt)
+                          textareaRef.current?.focus()
+                        }}
+                        className="text-left p-3.5 rounded-xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-primary-400 dark:hover:border-primary-500/60 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex items-center gap-2 font-semibold text-xs text-surface-800 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                          <span>{item.icon}</span>
+                          <span>{item.title}</span>
+                        </div>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-2">
+                          {item.prompt}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 messages.map((msg, index) => (
@@ -539,9 +568,9 @@ export function ChatPage() {
                       onChange={(e) => setSelectedModelProvider(e.target.value as 'gemini' | 'groq' | 'groq-deepseek')}
                       className="appearance-none text-xs font-medium bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-800 dark:text-surface-200 rounded-lg pl-3 pr-8 py-1.5 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 cursor-pointer shadow-sm transition-all hover:bg-surface-50 dark:hover:bg-surface-700/50"
                     >
-                      <option value="gemini" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Google Gemini 3.5 Flash</option>
-                      <option value="groq" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Groq Llama 3 (Fast)</option>
-                      <option value="groq-deepseek" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Groq DeepSeek R1 (Reasoning)</option>
+                      <option value="gemini" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Google Gemini 3.8 Flash</option>
+                      <option value="groq" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Groq GPT-OSS 120B (Fast)</option>
+                      <option value="groq-deepseek" className="bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200">Groq Qwen 3.8 27B (Reasoning)</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-surface-400 group-hover:text-surface-500 transition-colors">
                       <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
@@ -626,6 +655,23 @@ export function ChatPage() {
           </div>
         )}
       </div>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={Boolean(chatToDelete)}
+        onClose={() => setChatToDelete(null)}
+        onConfirm={() => {
+          if (chatToDelete) {
+            removeChat(chatToDelete)
+            setChatToDelete(null)
+          }
+        }}
+        title="Xóa đoạn chat này?"
+        message="Toàn bộ lịch sử tin nhắn trong cuộc trò chuyện này sẽ bị xóa và không thể khôi phục."
+        confirmText="Xóa đoạn chat"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

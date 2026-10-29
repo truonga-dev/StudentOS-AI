@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
-from fastapi import Request
-from app.core.limiter import limiter
-from fastapi_cache.decorator import cache
-
+from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+import json
+import re
+import base64
+
+from app.core.limiter import limiter
+from fastapi_cache.decorator import cache
 from app.core.config import settings
 from app.core.auth import get_user_id
+from app.core.prompts import CHAT_SYSTEM_PROMPT, PROMPTS_CONFIG, get_prompt_section, render_prompt
 from app.core.supabase_client import get_supabase, get_user_supabase
 from supabase import Client
 import google.generativeai as genai
+
 try:
     from groq import Groq
 except ImportError:
@@ -19,19 +23,11 @@ except ImportError:
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # ── Gemini Setup ──────────────────────────────────────────────────────────────
-# Configure API key from settings
 if settings.gemini_api_key:
     genai.configure(api_key=settings.gemini_api_key)
-    # Instantiate the model with a system instruction to act as a study assistant
-    # Print available models for debugging
-    print("Available Gemini models:")
-    for m in genai.list_models():
-        if "generateContent" in m.supported_generation_methods:
-            print(m.name)
-            
     model = genai.GenerativeModel(
-        "gemini-2.0-flash",
-        system_instruction="Bạn là một Trợ lý học tập xuất sắc tên là Student OS AI. Hãy trả lời ngắn gọn, thân thiện, khoa học, giúp sinh viên giải đáp bài tập, lên kế hoạch học tập hoặc giải thích các khái niệm. Luôn dùng tiếng Việt chuẩn, format markdown đẹp mắt."
+        PROMPTS_CONFIG["metadata"]["models"]["multimodal_vision"],
+        system_instruction=CHAT_SYSTEM_PROMPT,
     )
 else:
     model = None
@@ -42,50 +38,56 @@ if settings.groq_api_key and Groq:
 else:
     groq_client = None
 
-async def generate_text_with_fallback(prompt: str) -> str:
-    """Gọi Gemini, nếu lỗi 429 thì fallback sang Groq."""
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-        
-    try:
-        response = model.generate_content(prompt)
-        # Nếu bị chặn safety, response.text sẽ raise ValueError
-        return response.text
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Gemini error: {error_msg}")
-        
-        # Nếu có cấu hình Groq, ta sẽ fallback trên TẤT CẢ các lỗi từ Gemini (bao gồm 429, 500, 503, safety block, v.v.)
-        if groq_client:
-            print("Falling back to Groq...")
-            try:
-                groq_resp = groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.5
-                )
-                content = groq_resp.choices[0].message.content
-                if content:
-                    return content
-                else:
-                    raise Exception("Groq returned empty content")
-            except Exception as groq_err:
-                print(f"Groq fallback error: {groq_err}")
-                raise HTTPException(status_code=500, detail=f"AI Gemini lỗi ({error_msg}) và Groq cũng lỗi ({str(groq_err)}).")
-        else:
-            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                raise HTTPException(status_code=429, detail="AI đang quá tải (Gemini). Groq dự phòng chưa được cấu hình. Vui lòng thử lại sau.")
-            raise HTTPException(status_code=500, detail=f"Lỗi kết nối AI (Gemini): {error_msg}")
+
+@router.get("/prompts")
+async def get_ai_prompts_config():
+    """Trả về bộ cấu hình JSON Prompt chuẩn dành riêng cho dự án Student OS AI."""
+    return PROMPTS_CONFIG
 
 
-import json
+async def generate_text_with_fallback(prompt: str, system_prompt: Optional[str] = None) -> str:
+    """Ưu tiên gọi Groq (phản hồi ~1 giây), nếu lỗi thì fallback sang Gemini."""
+    if not groq_client and not model:
+        raise HTTPException(status_code=500, detail="AI API Key is not configured")
+
+    sys_instruction = system_prompt or CHAT_SYSTEM_PROMPT
+
+    if groq_client:
+        try:
+            groq_resp = groq_client.chat.completions.create(
+                model=PROMPTS_CONFIG["metadata"]["models"]["fast_stream"],
+                messages=[
+                    {"role": "system", "content": sys_instruction},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.5,
+            )
+            content = groq_resp.choices[0].message.content
+            if content:
+                return content
+        except Exception as groq_err:
+            print(f"Groq primary error: {groq_err}")
+
+    if model:
+        try:
+            response = model.generate_content(prompt, request_options={"timeout": 12})
+            return response.text
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Gemini error: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Lỗi kết nối AI: {error_msg}")
+
+    raise HTTPException(status_code=500, detail="Không thể kết nối tới dịch vụ AI")
+
 
 class FlashcardSchema(BaseModel):
     question: str
     answer: str
 
+
 class FlashcardListSchema(BaseModel):
     flashcards: list[FlashcardSchema]
+
 
 class QuizOptionSchema(BaseModel):
     question: str
@@ -93,62 +95,46 @@ class QuizOptionSchema(BaseModel):
     correct_index: int
     explanation: str
 
+
 class QuizListSchema(BaseModel):
     quiz: list[QuizOptionSchema]
+
 
 class MockTestMultipleChoiceSchema(BaseModel):
     question: str
     options: list[str]
     correct_answer: int
 
+
 class MockTestSchema(BaseModel):
     multiple_choice: list[MockTestMultipleChoiceSchema]
     essay: list[str]
+
 
 class GradeEssaySchema(BaseModel):
     score: float
     feedback: str
 
-async def generate_json_with_fallback(prompt: str, schema: type[BaseModel]) -> dict:
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                response_schema=schema
-            )
-        )
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Gemini Structured Output Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi AI xử lý JSON: {e}")
-
-import re
 
 def extract_json_from_text(text: str) -> str:
     """Trích xuất chuỗi JSON từ phản hồi của AI."""
     text = text.strip()
-    
-    # Tìm ```json ... ```
-    match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
     if match:
         return match.group(1).strip()
-        
-    # Thử tìm object/array ngoài cùng
+
     start_idx = -1
     end_idx = -1
-    
-    first_bracket = text.find('[')
-    last_bracket = text.rfind(']')
-    first_brace = text.find('{')
-    last_brace = text.rfind('}')
-    
+
+    first_bracket = text.find("[")
+    last_bracket = text.rfind("]")
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+
     if first_bracket != -1 and first_brace != -1:
         if first_bracket < first_brace:
             start_idx = first_bracket
-            end_idx = max(last_bracket, last_brace) # roughly
+            end_idx = max(last_bracket, last_brace)
         else:
             start_idx = first_brace
             end_idx = max(last_bracket, last_brace)
@@ -158,275 +144,225 @@ def extract_json_from_text(text: str) -> str:
     elif first_brace != -1:
         start_idx = first_brace
         end_idx = last_brace
-        
+
     if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-        return text[start_idx:end_idx+1]
-        
+        return text[start_idx : end_idx + 1]
+
     return text
 
-@router.post("/summarize")
-@limiter.limit('10/minute')
-@cache(expire=3600)
-async def summarize_text(request: Request, 
-    text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
-):
-    """
-    Tóm tắt nội dung ghi chú sử dụng Gemini AI.
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
+async def generate_json_with_fallback(
+    prompt: str, schema: type[BaseModel], system_prompt: Optional[str] = None
+) -> dict:
+    if not groq_client and not model:
+        raise HTTPException(status_code=500, detail="AI API Key is not configured")
+
+    if groq_client:
+        try:
+            schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False)
+            sys_msg = (
+                f"{system_prompt}\nReturn ONLY valid JSON matching this schema: {schema_json}"
+                if system_prompt
+                else f"Return ONLY valid JSON matching this schema: {schema_json}"
+            )
+            groq_resp = groq_client.chat.completions.create(
+                model=PROMPTS_CONFIG["metadata"]["models"]["fast_stream"],
+                messages=[
+                    {"role": "system", "content": sys_msg},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+            )
+            raw = groq_resp.choices[0].message.content or "{}"
+            parsed = json.loads(extract_json_from_text(raw))
+            if isinstance(parsed, list):
+                fields = list(schema.model_fields.keys())
+                if len(fields) == 1:
+                    return {fields[0]: parsed}
+            return parsed
+        except Exception as groq_err:
+            print(f"Groq JSON primary error: {groq_err}")
+
+    if model:
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                ),
+                request_options={"timeout": 15},
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Gemini Structured Output Error: {e}")
+            raise HTTPException(status_code=500, detail=f"Lỗi AI xử lý JSON: {e}")
+
+    raise HTTPException(status_code=500, detail="Không thể xử lý JSON từ AI")
+
+
+@router.post("/summarize")
+@limiter.limit("10/minute")
+@cache(expire=3600)
+async def summarize_text(
+    request: Request,
+    text: str = Body(..., embed=True),
+    user_id: str = Depends(get_user_id),
+):
+    """Tóm tắt nội dung ghi chú sử dụng cấu hình Prompt JSON của dự án."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
     if len(text) > 5000:
         raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
-    prompt = f"""
-    Bạn là một trợ lý học tập AI xuất sắc. 
-    Hãy đọc và tóm tắt ghi chú học tập dưới đây một cách cực kỳ ngắn gọn, súc tích, 
-    nhấn mạnh vào các ý chính, khái niệm quan trọng và kiến thức cốt lõi.
-    Trình bày bằng các gạch đầu dòng (markdown) rõ ràng. Dùng tiếng Việt chuẩn.
-    
-    Ghi chú:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("summarize_note", text=text)
+    sys_prompt = get_prompt_section("summarize_note").get("system_prompt")
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
+        text_res = await generate_text_with_fallback(prompt, sys_prompt)
         return {"summary": text_res}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Lỗi xử lý AI")
 
 
 @router.post("/suggest-tasks")
-@limiter.limit('10/minute')
+@limiter.limit("10/minute")
 @cache(expire=3600)
-async def suggest_tasks(request: Request, 
+async def suggest_tasks(
+    request: Request,
     text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
-    """
-    Phân tích ghi chú và gợi ý các task (bài tập, ôn tập) cần làm.
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-
+    """Phân tích ghi chú và gợi ý các task cần làm."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
     if len(text) > 5000:
         raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
-    prompt = f"""
-    Dựa vào ghi chú bài học dưới đây, hãy đề xuất 3-5 hành động/bài tập (to-do list) cụ thể 
-    mà sinh viên nên làm tiếp theo để nắm vững kiến thức.
-    Trình bày dưới dạng danh sách gạch đầu dòng ngắn gọn.
-    
-    Ghi chú:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("suggest_tasks", text=text)
+    sys_prompt = get_prompt_section("suggest_tasks").get("system_prompt")
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
+        text_res = await generate_text_with_fallback(prompt, sys_prompt)
         return {"tasks": text_res}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Lỗi xử lý AI")
 
 
 @router.post("/generate-mindmap")
-@limiter.limit('10/minute')
+@limiter.limit("10/minute")
 @cache(expire=3600)
-async def generate_mindmap_endpoint(request: Request, 
+async def generate_mindmap_endpoint(
+    request: Request,
     text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
-    """
-    Phân tích ghi chú và tạo sơ đồ tư duy dạng Mermaid (graph TD hoặc mindmap).
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-
+    """Phân tích ghi chú và tạo sơ đồ tư duy dạng Mermaid (graph TD)."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
     if len(text) > 5000:
         raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
-    prompt = f"""
-    Dựa vào ghi chú bài học dưới đây, hãy tạo ra một biểu đồ sơ đồ tư duy (mindmap) bằng cú pháp MermaidJS.
-    
-    YÊU CẦU BẮT BUỘC:
-    1. Bắt đầu câu trả lời NGAY LẬP TỨC bằng chữ `graph TD`.
-    2. TUYỆT ĐỐI KHÔNG thêm bất kỳ một chữ nào khác (như "Dưới đây là...", "✅ Task...", v.v). Không dùng markdown block (```mermaid). Chỉ trả về text code thuần túy.
-    3. Hướng biểu đồ nên dùng `graph TD`.
-    4. CỰC KỲ QUAN TRỌNG: Tên định danh của node (Node ID) TUYỆT ĐỐI KHÔNG ĐƯỢC chứa dấu cách (space) hoặc ký tự đặc biệt. Hãy dùng các chữ cái hoặc số dính liền nhau (VD: A, B1, Node2, GiaiDoan1).
-    5. TUYỆT ĐỐI luôn bọc nội dung hiển thị (Label) của các node trong dấu ngoặc kép (" ") và dùng ngoặc vuông [ ]. 
-       Ví dụ đúng: Node1["Giai đoạn 1: Dart Cơ bản (Cú pháp)"]
-       Ví dụ sai: Giai đoạn 1["Giai đoạn 1"] (Vì Node ID có dấu cách)
-       Ví dụ sai: Node1((Giai đoạn 1)) (Không dùng ngoặc đơn tròn hoặc thả rông)
-
-    Ví dụ mẫu bắt buộc tuân theo (lưu ý Node ID như A, B, C không có dấu cách):
-    graph TD
-        A["Ý chính (Cốt lõi)"] --> B["Nhánh 1: Cơ bản"]
-        A --> C["Nhánh 2: Nâng cao"]
-        B --> B1["Chi tiết 1"]
-
-    Ghi chú:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("generate_mindmap", text=text)
+    sys_prompt = get_prompt_section("generate_mindmap").get("system_prompt")
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
+        text_res = await generate_text_with_fallback(prompt, sys_prompt)
         clean_text = text_res.strip()
-        
-        # Lọc bỏ mọi thứ trước chữ "graph" hoặc "mindmap"
+
         if "graph " in clean_text:
-            clean_text = clean_text[clean_text.find("graph "):]
+            clean_text = clean_text[clean_text.find("graph ") :]
         elif "mindmap" in clean_text:
-            clean_text = clean_text[clean_text.find("mindmap"):]
-            
+            clean_text = clean_text[clean_text.find("mindmap") :]
+
         if clean_text.startswith("```mermaid"):
             clean_text = clean_text[10:]
         elif clean_text.startswith("```"):
             clean_text = clean_text[3:]
-        
-        # Strip trailing backticks
+
         clean_text = clean_text.split("```")[0].strip()
-            
         return {"mindmap": clean_text}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Lỗi xử lý AI")
 
 
 @router.post("/generate-flashcards-from-text")
-@limiter.limit('10/minute')
+@limiter.limit("10/minute")
 @cache(expire=3600)
-async def generate_flashcards_from_text_endpoint(request: Request, 
+async def generate_flashcards_from_text_endpoint(
+    request: Request,
     text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
-    """
-    Sử dụng Gemini để đọc văn bản và sinh bộ flashcard (JSON).
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-
+    """Đọc văn bản và sinh bộ flashcard (JSON)."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Thiếu dữ liệu văn bản")
 
-    prompt = f"""
-    Bạn là một trợ lý giáo dục xuất sắc.
-    Hãy đọc ghi chú học tập dưới đây, trích xuất các ý chính quan trọng, các định nghĩa hoặc công thức.
-    Sau đó, hãy tạo ra một danh sách các thẻ ghi nhớ (Flashcards).
-    
-    YÊU CẦU BẮT BUỘC: 
-    Trường trả về phải ĐÚNG ĐỊNH DẠNG JSON MẢNG (Array of JSON) chứa các object gồm 2 key: "question" và "answer".
-    Chỉ trả về JSON, tuyệt đối KHÔNG có markdown ```json ở đầu hay cuối đoạn.
-    
-    Ví dụ:
-    [
-      {{ "question": "Khái niệm A là gì?", "answer": "Là một khái niệm..." }},
-      {{ "question": "Công thức tính B?", "answer": "B = x + y" }}
-    ]
-
-    Ghi chú:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("generate_flashcards_text", text=text)
+    sys_prompt = get_prompt_section("generate_flashcards_text").get("system_prompt")
 
     try:
-        data = await generate_json_with_fallback(prompt, FlashcardListSchema)
+        data = await generate_json_with_fallback(prompt, FlashcardListSchema, sys_prompt)
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi phân tích: {str(e)}")
 
-@router.post("/generate-quiz")
-@limiter.limit('10/minute')
-@cache(expire=3600)
-async def generate_quiz_endpoint(request: Request, 
-    text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
-):
-    """
-    Sử dụng Gemini để đọc văn bản và sinh bài thi trắc nghiệm (JSON).
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
+@router.post("/generate-quiz")
+@limiter.limit("10/minute")
+@cache(expire=3600)
+async def generate_quiz_endpoint(
+    request: Request,
+    text: str = Body(..., embed=True),
+    user_id: str = Depends(get_user_id),
+):
+    """Đọc văn bản và sinh bài thi trắc nghiệm (JSON)."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Thiếu dữ liệu văn bản")
 
-    prompt = f"""
-    Bạn là một giáo viên xuất sắc.
-    Hãy đọc nội dung dưới đây và tạo ra một bài thi trắc nghiệm gồm 5 câu hỏi để kiểm tra kiến thức.
-    
-    YÊU CẦU BẮT BUỘC: 
-    Trường trả về phải ĐÚNG ĐỊNH DẠNG JSON MẢNG (Array of JSON) chứa các câu hỏi.
-    Mỗi câu hỏi phải có các trường: "question", "options" (mảng 4 đáp án), "correct_index" (vị trí đáp án đúng từ 0-3), "explanation" (giải thích ngắn gọn).
-    Chỉ trả về JSON, tuyệt đối KHÔNG có markdown ```json ở đầu hay cuối đoạn.
-    
-    Ví dụ:
-    [
-      {{ 
-        "question": "Thủ đô của Việt Nam là gì?", 
-        "options": ["Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Huế"],
-        "correct_index": 0,
-        "explanation": "Hà Nội là thủ đô của Việt Nam."
-      }}
-    ]
-
-    Nội dung:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("generate_quiz", text=text)
+    sys_prompt = get_prompt_section("generate_quiz").get("system_prompt")
 
     try:
-        data = await generate_json_with_fallback(prompt, QuizListSchema)
+        data = await generate_json_with_fallback(prompt, QuizListSchema, sys_prompt)
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý AI: {str(e)}")
 
-@router.post("/breakdown-task")
-@limiter.limit('10/minute')
-@cache(expire=3600)
-async def breakdown_task(request: Request, 
-    text: str = Body(..., embed=True),
-    user_id: str = Depends(get_user_id)
-):
-    """
-    Phân tích một công việc lớn thành các công việc nhỏ (sub-tasks).
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
+@router.post("/breakdown-task")
+@limiter.limit("10/minute")
+@cache(expire=3600)
+async def breakdown_task(
+    request: Request,
+    text: str = Body(..., embed=True),
+    user_id: str = Depends(get_user_id),
+):
+    """Phân tích một công việc lớn thành các công việc nhỏ (sub-tasks)."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nội dung trống")
     if len(text) > 5000:
         raise HTTPException(status_code=400, detail="Văn bản quá dài (tối đa 5000 ký tự)")
 
-    prompt = f"""
-    Bạn là một chuyên gia quản lý thời gian và năng suất.
-    Hãy phân tích công việc dưới đây thành một danh sách các công việc nhỏ hơn (sub-tasks) để dễ dàng thực hiện.
-    Trình bày dưới dạng danh sách gạch đầu dòng (markdown checklist: - [ ] ).
-    Chỉ trả về danh sách, không cần giải thích dài dòng.
-    
-    Công việc:
-    \"\"\"{text}\"\"\"
-    """
+    prompt = render_prompt("breakdown_task", text=text)
+    sys_prompt = get_prompt_section("breakdown_task").get("system_prompt")
 
     try:
-        text_res = await generate_text_with_fallback(prompt)
+        text_res = await generate_text_with_fallback(prompt, sys_prompt)
         return {"subtasks": text_res}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Lỗi xử lý AI")
 
 
@@ -435,40 +371,43 @@ class ChatMessage(BaseModel):
     content: str
     attachments: Optional[List[Dict]] = None
 
+
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    model_provider: str = "gemini"  # "gemini" | "groq"
+    model_provider: str = "gemini"  # "gemini" | "groq" | "groq-deepseek"
+
 
 @router.post("/chat")
-@limiter.limit('10/minute')
-async def chat_with_ai(request: Request, 
+@limiter.limit("10/minute")
+async def chat_with_ai(
+    request: Request,
     req: ChatRequest,
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
-    """
-    Tương tác chat với Gemini AI, nhận vào lịch sử tin nhắn.
-    """
-    if req.model_provider == "gemini" and not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
+    """Tương tác chat với Student OS AI, nhận vào lịch sử tin nhắn."""
+    if req.model_provider == "gemini" and not model and not groq_client:
+        raise HTTPException(status_code=500, detail="AI API Key is not configured")
     if req.model_provider.startswith("groq") and not groq_client:
-        raise HTTPException(status_code=500, detail="Groq API Key is not configured or groq package is missing")
+        raise HTTPException(status_code=500, detail="Groq API Key is not configured")
 
     if not req.messages:
         raise HTTPException(status_code=400, detail="Danh sách tin nhắn trống")
 
-    if req.model_provider.startswith("groq"):
-        # Determine the exact groq model string
-        groq_model_id = "llama-3.3-70b-versatile"
-        if req.model_provider == "groq-deepseek":
-            groq_model_id = "deepseek-r1-distill-llama-70b"
+    has_image = any(
+        att.get("type") == "image" and att.get("data")
+        for m in req.messages
+        for att in (m.attachments or [])
+    )
 
-        # Format history cho Groq
-        groq_messages = [
-            {"role": "system", "content": "Bạn là một Trợ lý học tập xuất sắc tên là Student OS AI. Hãy trả lời ngắn gọn, thân thiện, khoa học. ĐẶC BIỆT LƯU Ý VỚI CÔNG THỨC TOÁN HỌC: TUYỆT ĐỐI KHÔNG dùng `\\(` hay `\\)` hay `\\[` hay `\\]`. Thay vào đó, hãy bọc tất cả công thức toán học trong dấu backtick (`) để hiển thị như code inline, hoặc viết một cách đơn giản bằng văn bản thuần."}
-        ]
+    if groq_client and not has_image:
+        groq_model_id = PROMPTS_CONFIG["metadata"]["models"]["fast_stream"]
+        if req.model_provider == "groq-deepseek":
+            groq_model_id = PROMPTS_CONFIG["metadata"]["models"]["deep_reasoning"]
+
+        groq_messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
         for m in req.messages:
             groq_messages.append({"role": m.role, "content": m.content})
-        
+
         def generate_groq_responses():
             try:
                 stream = groq_client.chat.completions.create(
@@ -481,23 +420,21 @@ async def chat_with_ai(request: Request,
                         yield chunk.choices[0].delta.content
             except Exception as e:
                 print(f"Groq chat stream error: {e}")
-                yield " (Lỗi phản hồi từ AI Groq)"
+                yield f" (Lỗi phản hồi từ AI: {e})"
 
         return StreamingResponse(generate_groq_responses(), media_type="text/plain")
 
-    # Format history cho Gemini (model.generate_content hỗ trợ list of dict)
-    # Cấu trúc của Gemini: {"role": "user" hoặc "model", "parts": ["text"]}
     gemini_messages = []
-    
+    vision_default_prompt = get_prompt_section("chat_assistant").get(
+        "vision_default_user_prompt",
+        "Hãy phân tích chi tiết hình ảnh này giúp tôi.",
+    )
+
     for m in req.messages:
-        # Chuyển đổi role 'assistant' (từ frontend) sang 'model' (cho Gemini)
         gemini_role = "model" if m.role == "assistant" else "user"
-        
-        parts = [m.content]
-        
-        # Thêm hình ảnh nếu có
+        parts = [m.content or vision_default_prompt]
+
         if m.attachments:
-            import base64
             for att in m.attachments:
                 if att.get("type") == "image" and att.get("data"):
                     base64_data = att["data"]
@@ -505,27 +442,38 @@ async def chat_with_ai(request: Request,
                         base64_data = base64_data.split(",")[1]
                     try:
                         decoded_data = base64.b64decode(base64_data)
-                        parts.append({
-                            "mime_type": "image/jpeg", # Default to jpeg or you can pass it from frontend
-                            "data": decoded_data
-                        })
+                        parts.append({"mime_type": "image/jpeg", "data": decoded_data})
                     except Exception as e:
                         print(f"Failed to decode image attachment: {e}")
 
-        gemini_messages.append({
-            "role": gemini_role,
-            "parts": parts
-        })
+        gemini_messages.append({"role": gemini_role, "parts": parts})
 
     def generate_responses():
         try:
-            # Dùng generate_content dạng stream
             response_stream = model.generate_content(gemini_messages, stream=True)
             for chunk in response_stream:
                 if chunk.text:
                     yield chunk.text
         except Exception as e:
             print(f"Gemini chat stream error: {e}")
+            if groq_client:
+                try:
+                    groq_messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+                    for m in req.messages:
+                        groq_messages.append(
+                            {"role": m.role, "content": m.content or vision_default_prompt}
+                        )
+                    stream = groq_client.chat.completions.create(
+                        model=PROMPTS_CONFIG["metadata"]["models"]["fast_stream"],
+                        messages=groq_messages,
+                        stream=True,
+                    )
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                    return
+                except Exception as groq_err:
+                    print(f"Groq stream fallback error: {groq_err}")
             yield " (Lỗi phản hồi từ AI)"
 
     return StreamingResponse(generate_responses(), media_type="text/plain")
@@ -535,171 +483,153 @@ class GenerateFlashcardsRequest(BaseModel):
     image_base64: str
     mime_type: str = "image/jpeg"
 
+
 @router.post("/generate-flashcards")
-@limiter.limit('10/minute')
-async def generate_flashcards(request: Request, 
+@limiter.limit("10/minute")
+async def generate_flashcards(
+    request: Request,
     req: GenerateFlashcardsRequest,
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
-    """
-    Sử dụng khả năng Vision của Gemini để đọc ảnh tài liệu và sinh bộ flashcard (JSON).
-    """
+    """Sử dụng khả năng Vision của Gemini để đọc ảnh tài liệu và sinh bộ flashcard (JSON)."""
     if not model:
         raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
     if not req.image_base64:
         raise HTTPException(status_code=400, detail="Thiếu dữ liệu ảnh")
-    
+
     if len(req.image_base64) > 7 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Kích thước ảnh quá lớn (tối đa ~5MB)")
 
-    # Loại bỏ prefix data:image/...;base64, nếu frontend có gửi lên
     base64_data = req.image_base64
     if "," in base64_data:
         base64_data = base64_data.split(",")[1]
 
-    prompt = """
-    Bạn là một trợ lý giáo dục xuất sắc.
-    Hãy đọc tài liệu trong bức ảnh này, trích xuất các ý chính quan trọng, các định nghĩa hoặc công thức.
-    Sau đó, hãy tạo ra một danh sách các thẻ ghi nhớ (Flashcards).
-    
-    YÊU CẦU BẮT BUỘC: 
-    Trường trả về phải ĐÚNG ĐỊNH DẠNG JSON MẢNG (Array of JSON) chứa các object gồm 2 key: "question" và "answer".
-    Chỉ trả về JSON, tuyệt đối KHÔNG có markdown ```json ở đầu hay cuối đoạn.
-    
-    Ví dụ:
-    [
-      { "question": "Khái niệm A là gì?", "answer": "Là một khái niệm..." },
-      { "question": "Công thức tính B?", "answer": "B = x + y" }
-    ]
-    """
+    prompt = render_prompt("generate_flashcards_image")
 
-    import base64
     try:
         decoded_data = base64.b64decode(base64_data)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Dữ liệu ảnh/tài liệu không hợp lệ (không phải base64)")
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail="Dữ liệu ảnh/tài liệu không hợp lệ (không phải base64)"
+        )
 
     try:
-        response = model.generate_content([
-            prompt, 
-            {
-                "mime_type": req.mime_type,
-                "data": decoded_data
-            }
-        ], generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            response_schema=FlashcardListSchema
-        ))
-        
-        import json
-        flashcards_data = json.loads(response.text)
-        return flashcards_data
-            
+        response = model.generate_content(
+            [prompt, {"mime_type": req.mime_type, "data": decoded_data}],
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=FlashcardListSchema,
+            ),
+        )
+        return json.loads(response.text)
     except HTTPException:
         raise
     except Exception as e:
         error_msg = str(e)
         print(f"Gemini OCR error: {error_msg}")
         if "429" in error_msg or "Quota" in error_msg or "rate limit" in error_msg.lower():
-            raise HTTPException(status_code=429, detail="AI đang quá tải hoặc hết lượt sử dụng miễn phí. Vui lòng đợi một lát rồi thử lại.")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi phân tích ảnh bằng Gemini AI: {error_msg}")
+            raise HTTPException(
+                status_code=429,
+                detail="AI đang quá tải hoặc hết lượt sử dụng miễn phí. Vui lòng đợi một lát rồi thử lại.",
+            )
+        raise HTTPException(
+            status_code=500, detail=f"Lỗi khi phân tích ảnh bằng Gemini AI: {error_msg}"
+        )
+
 
 class GenerateFlashcardsFromDocumentRequest(BaseModel):
     file_names: List[str]
 
+
 @router.post("/generate-flashcards-from-document")
-@limiter.limit('10/minute')
-async def generate_flashcards_from_document(request: Request, 
+@limiter.limit("10/minute")
+async def generate_flashcards_from_document(
+    request: Request,
     req: GenerateFlashcardsFromDocumentRequest,
     user_id: str = Depends(get_user_id),
-    sb: Client = Depends(get_user_supabase)
+    sb: Client = Depends(get_user_supabase),
 ):
-    """
-    Tạo flashcards từ tài liệu đã upload (qua document_chunks).
-    """
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-
+    """Tạo flashcards từ tài liệu đã upload (qua document_chunks)."""
     if not req.file_names:
         raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất một tài liệu")
-    
-    # Query all chunks for these files and this user
-    res = sb.table("document_chunks").select("content").eq("user_id", user_id).in_("file_name", req.file_names).execute()
-    
+
+    res = (
+        sb.table("document_chunks")
+        .select("content")
+        .eq("user_id", user_id)
+        .in_("file_name", req.file_names)
+        .execute()
+    )
+
     chunks = res.data or []
     if not chunks:
-        raise HTTPException(status_code=404, detail="Không tìm thấy nội dung của tài liệu. Có thể tài liệu chưa được xử lý văn bản.")
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy nội dung của tài liệu. Có thể tài liệu chưa được xử lý văn bản.",
+        )
 
-    # Concatenate contents
     full_text = "\n\n".join([chunk["content"] for chunk in chunks])
-    
-    prompt = f"""
-    Bạn là một trợ lý giáo dục xuất sắc.
-    Hãy đọc nội dung từ các tài liệu dưới đây, trích xuất các ý chính quan trọng, các định nghĩa hoặc công thức.
-    Sau đó, hãy tạo ra một danh sách các thẻ ghi nhớ (Flashcards).
-    
-    YÊU CẦU BẮT BUỘC: 
-    Trường trả về phải ĐÚNG ĐỊNH DẠNG JSON MẢNG (Array of JSON) chứa các object gồm 2 key: "question" và "answer".
-    Chỉ trả về JSON, tuyệt đối KHÔNG có markdown ```json ở đầu hay cuối đoạn.
-    
-    Ví dụ:
-    [
-      {{ "question": "Khái niệm A là gì?", "answer": "Là một khái niệm..." }},
-      {{ "question": "Công thức tính B?", "answer": "B = x + y" }}
-    ]
-
-    Tài liệu:
-    \"\"\"{full_text}\"\"\"
-    """
+    prompt = render_prompt("generate_flashcards_document", full_text=full_text)
+    sys_prompt = get_prompt_section("generate_flashcards_document").get("system_prompt")
 
     try:
-        data = await generate_json_with_fallback(prompt, FlashcardListSchema)
+        data = await generate_json_with_fallback(prompt, FlashcardListSchema, sys_prompt)
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý AI: {str(e)}")
 
+
 class WeeklyReportRequest(BaseModel):
     week_start: str
     week_end: str
 
+
 @router.post("/generate-weekly-report")
-@limiter.limit('10/minute')
-async def generate_weekly_report(request: Request, 
+@limiter.limit("10/minute")
+async def generate_weekly_report(
+    request: Request,
     req: WeeklyReportRequest,
     user_id: str = Depends(get_user_id),
-    sb: Client = Depends(get_user_supabase)
+    sb: Client = Depends(get_user_supabase),
 ):
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
-    
-    # Lấy tasks tuần qua
-    res_tasks = sb.table("tasks").select("title, completed, due_date").eq("user_id", user_id).gte("due_date", req.week_start).lte("due_date", req.week_end).execute()
+    res_tasks = (
+        sb.table("tasks")
+        .select("title, completed, due_date")
+        .eq("user_id", user_id)
+        .gte("due_date", req.week_start)
+        .lte("due_date", req.week_end)
+        .execute()
+    )
     tasks = res_tasks.data or []
-    
-    # Lấy study sessions tuần qua
-    res_sessions = sb.table("study_sessions").select("duration_minutes, subjects(title)").eq("user_id", user_id).gte("started_at", req.week_start).lte("ended_at", req.week_end).execute()
+
+    res_sessions = (
+        sb.table("study_sessions")
+        .select("duration_minutes, subjects(title)")
+        .eq("user_id", user_id)
+        .gte("started_at", req.week_start)
+        .lte("ended_at", req.week_end)
+        .execute()
+    )
     sessions = res_sessions.data or []
-    
+
     total_study_minutes = sum(s.get("duration_minutes", 0) for s in sessions)
     completed_tasks = [t for t in tasks if t.get("completed")]
     pending_tasks = [t for t in tasks if not t.get("completed")]
 
-    prompt = f"""
-    Bạn là AI Cố vấn học tập (Student OS AI). 
-    Dựa trên dữ liệu học tập tuần qua của sinh viên, hãy viết một báo cáo ngắn gọn, khích lệ và đề xuất hướng cải thiện cho tuần tới.
-    - Thời gian học: {total_study_minutes} phút.
-    - Công việc đã hoàn thành: {len(completed_tasks)}
-    - Công việc chưa hoàn thành: {len(pending_tasks)}
-    
-    Trả về định dạng HTML cơ bản (chỉ dùng các thẻ <b>, <i>, <p>, <ul>, <li>, <br>).
-    TUYỆT ĐỐI KHÔNG DÙNG thuộc tính style hay bất kỳ class CSS/Tailwind nào (như bg-white, text-black, v.v.) để tránh lỗi hiển thị trong Dark Mode. Trả về CHỈ HTML, không chứa thẻ markdown bao bọc.
-    """
+    prompt = render_prompt(
+        "weekly_advisor_report",
+        total_study_minutes=total_study_minutes,
+        completed_tasks_count=len(completed_tasks),
+        pending_tasks_count=len(pending_tasks),
+        user_prompt="Phân tích kết quả học tập tuần qua và đề xuất hướng cải thiện cho tuần tới.",
+    )
+    sys_prompt = get_prompt_section("weekly_advisor_report").get("system_prompt")
 
     try:
-        report_html = await generate_text_with_fallback(prompt)
+        report_html = await generate_text_with_fallback(prompt, sys_prompt)
         report_html = report_html.strip()
         if report_html.startswith("```html"):
             report_html = report_html[7:]
@@ -708,100 +638,91 @@ async def generate_weekly_report(request: Request,
         if report_html.endswith("```"):
             report_html = report_html[:-3]
         report_html = report_html.strip()
-        
-        # Lưu vào DB
-        sb.table("ai_reports").insert({
-            "user_id": user_id,
-            "week_start": req.week_start,
-            "week_end": req.week_end,
-            "content": report_html
-        }).execute()
+
+        sb.table("ai_reports").insert(
+            {
+                "user_id": user_id,
+                "week_start": req.week_start,
+                "week_end": req.week_end,
+                "content": report_html,
+            }
+        ).execute()
 
         return {"content": report_html}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi tạo báo cáo: {str(e)}")
 
+
 @router.get("/weekly-reports")
-@limiter.limit('10/minute')
-async def get_weekly_reports(request: Request, user_id: str = Depends(get_user_id), sb: Client = Depends(get_user_supabase)):
-    res = sb.table("ai_reports").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+@limiter.limit("10/minute")
+async def get_weekly_reports(
+    request: Request,
+    user_id: str = Depends(get_user_id),
+    sb: Client = Depends(get_user_supabase),
+):
+    res = (
+        sb.table("ai_reports")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
     return res.data
+
 
 class GenerateMockTestRequest(BaseModel):
     topic: str
     num_multiple_choice: int = 5
     num_essay: int = 1
 
-@router.post("/generate-mock-test")
-@limiter.limit('10/minute')
-async def generate_mock_test(request: Request, 
-    req: GenerateMockTestRequest,
-    user_id: str = Depends(get_user_id)
-):
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
-    prompt = f"""
-    Bạn là chuyên gia giáo dục. Hãy tạo một đề thi thử về chủ đề: "{req.topic}".
-    Đề thi bao gồm: {req.num_multiple_choice} câu trắc nghiệm (với 4 đáp án A, B, C, D và có đánh dấu đáp án đúng) và {req.num_essay} câu tự luận.
-    
-    YÊU CẦU BẮT BUỘC:
-    Trường trả về phải ĐÚNG ĐỊNH DẠNG JSON với cấu trúc sau, không chứa thẻ markdown (như ```json):
-    {{
-      "multiple_choice": [
-        {{
-          "question": "Câu hỏi?",
-          "options": ["A. Đáp án 1", "B. Đáp án 2", "C. Đáp án 3", "D. Đáp án 4"],
-          "correct_answer": 0 
-        }}
-      ],
-      "essay": [
-        "Câu hỏi tự luận 1?",
-        "Câu hỏi tự luận 2?"
-      ]
-    }}
-    Lưu ý `correct_answer` là index của mảng options (0-3).
-    """
+@router.post("/generate-mock-test")
+@limiter.limit("10/minute")
+async def generate_mock_test(
+    request: Request,
+    req: GenerateMockTestRequest,
+    user_id: str = Depends(get_user_id),
+):
+    prompt = render_prompt(
+        "generate_mock_test",
+        topic=req.topic,
+        num_multiple_choice=req.num_multiple_choice,
+        num_essay=req.num_essay,
+    )
+    sys_prompt = get_prompt_section("generate_mock_test").get("system_prompt")
 
     try:
-        data = await generate_json_with_fallback(prompt, MockTestSchema)
+        data = await generate_json_with_fallback(prompt, MockTestSchema, sys_prompt)
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi tạo đề thi: {str(e)}")
 
+
 class GradeEssayRequest(BaseModel):
     question: str
     student_answer: str
 
-@router.post("/grade-essay")
-@limiter.limit('10/minute')
-async def grade_essay(request: Request, 
-    req: GradeEssayRequest,
-    user_id: str = Depends(get_user_id)
-):
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini API Key is not configured")
 
-    prompt = f"""
-    Bạn là một giám khảo chấm thi.
-    Câu hỏi: {req.question}
-    Câu trả lời của học sinh: {req.student_answer}
-    
-    Hãy chấm điểm (thang điểm 10) và đưa ra nhận xét chi tiết, chỉ ra điểm đúng, điểm sai và cách cải thiện.
-    Trả về định dạng JSON, không kèm markdown bao bọc:
-    {{
-      "score": 8.5,
-      "feedback": "Nhận xét chi tiết ở đây..."
-    }}
-    """
-    
+@router.post("/grade-essay")
+@limiter.limit("10/minute")
+async def grade_essay(
+    request: Request,
+    req: GradeEssayRequest,
+    user_id: str = Depends(get_user_id),
+):
+    prompt = render_prompt(
+        "grade_essay",
+        question=req.question,
+        student_answer=req.student_answer,
+    )
+    sys_prompt = get_prompt_section("grade_essay").get("system_prompt")
+
     try:
-        data = await generate_json_with_fallback(prompt, GradeEssaySchema)
+        data = await generate_json_with_fallback(prompt, GradeEssaySchema, sys_prompt)
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi chấm thi: {str(e)}")
-

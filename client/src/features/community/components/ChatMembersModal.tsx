@@ -5,6 +5,7 @@ import { getMembers, kickMember, addMember } from '@/services/community'
 import { getFriends } from '@/services/social'
 import { useAuth } from '@/hooks/useAuth'
 import toast from 'react-hot-toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface ChatMembersModalProps {
   channelId: string
@@ -23,6 +24,7 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
   const [isInviting, setIsInviting] = useState(false)
   const [friends, setFriends] = useState<any[]>([])
   const [loadingFriends, setLoadingFriends] = useState(false)
+  const [memberToKick, setMemberToKick] = useState<string | null>(null)
 
   useEffect(() => {
     loadMembers()
@@ -53,14 +55,21 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
     }
   }
 
-  const handleKick = async (userId: string) => {
-    if (!confirm('Bạn có chắc chắn muốn kick thành viên này khỏi nhóm?')) return
+  const handleKick = (userId: string) => {
+    setMemberToKick(userId)
+  }
+
+  const confirmKick = async () => {
+    if (!memberToKick) return
+    const userId = memberToKick
     try {
       await kickMember(channelId, userId)
-      toast.success('Đã kick thành viên')
+      toast.success('Đã kick thành viên khỏi nhóm')
       setMembers(prev => prev.filter(m => m.user_id !== userId))
     } catch (error: any) {
       toast.error(error.message || 'Lỗi kick thành viên')
+    } finally {
+      setMemberToKick(null)
     }
   }
 
@@ -207,6 +216,18 @@ export function ChatMembersModal({ channelId, onClose, onMemberClick }: ChatMemb
           </div>
         )}
       </div>
+
+      {/* Confirm Kick Member Modal */}
+      <ConfirmModal
+        isOpen={Boolean(memberToKick)}
+        onClose={() => setMemberToKick(null)}
+        onConfirm={confirmKick}
+        title="Kick thành viên khỏi nhóm?"
+        message="Thành viên này sẽ bị xóa khỏi kênh chat cộng đồng."
+        confirmText="Xác nhận kick"
+        cancelText="Hủy"
+        type="warning"
+      />
     </div>
   )
 }

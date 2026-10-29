@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { BookOpen, Play, CheckCircle2, ChevronRight, PenTool, Loader2 } from 'lucide-react'
+import { BookOpen, Play, CheckCircle2, PenTool, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import toast from 'react-hot-toast'
-import { supabase } from '@/lib/supabase'
+import { generateMockTest, gradeEssay } from '@/services/ai'
 
 type MockTestStep = 'setup' | 'doing' | 'result'
 
@@ -41,26 +41,7 @@ export function MockTestPage() {
     }
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error("Chưa đăng nhập")
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ai/generate-mock-test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          topic,
-          num_multiple_choice: numMC,
-          num_essay: numEssay
-        })
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) throw new Error(result.detail || 'Lỗi khi tạo đề thi')
-
+      const result = await generateMockTest(topic, numMC, numEssay)
       setTestData(result)
       setStep('doing')
       setMcAnswers({})
@@ -85,19 +66,8 @@ export function MockTestPage() {
         const student_answer = essayAnswers[i] || 'Không làm bài'
         
         try {
-          const { data: { session } } = await supabase.auth.getSession()
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/ai/grade-essay`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token}`
-            },
-            body: JSON.stringify({ question, student_answer })
-          })
-          if (response.ok) {
-            results[i] = await response.json()
-          }
-        } catch (e) {
+          results[i] = await gradeEssay(question, student_answer)
+        } catch {
           results[i] = { score: 0, feedback: 'Không thể chấm điểm do lỗi kết nối' }
         }
       }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Loader2, Bot, Send, MessageSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
+import { generateWeeklyReport } from '@/services/ai'
 import { clsx } from 'clsx'
 import DOMPurify from 'dompurify'
 
@@ -49,32 +50,18 @@ export function AIWeeklyReport() {
     setLoading(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error("Chưa đăng nhập")
-
-      // This would ideally hit a chat endpoint. Using generate-weekly-report for now
-      // but in a real upgrade you'd have an /ai/chat endpoint.
       const today = new Date()
       const startOfWeek = new Date(today)
       startOfWeek.setDate(today.getDate() - today.getDay() + 1)
       startOfWeek.setHours(0, 0, 0, 0)
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ai/generate-weekly-report`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          week_start: startOfWeek.toISOString(),
-          week_end: new Date().toISOString()
-        })
-      })
 
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.detail || 'Lỗi khi gọi AI')
+      const content = await generateWeeklyReport(
+        startOfWeek.toISOString(),
+        new Date().toISOString(),
+        userPrompt
+      )
 
-      setMessages(prev => [...prev, { role: 'ai', text: result.content }])
+      setMessages(prev => [...prev, { role: 'ai', text: content }])
     } catch (error: any) {
       toast.error(error.message || 'Có lỗi xảy ra')
       setMessages(prev => [...prev, { role: 'ai', text: 'Xin lỗi, mình đang gặp sự cố kết nối. Bạn thử lại sau nhé!' }])

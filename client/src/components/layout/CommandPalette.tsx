@@ -44,9 +44,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null
 
-  const filteredPages = PAGES.filter(page =>
-    page.name.toLowerCase().includes(query.toLowerCase())
-  )
+  const filteredPages = PAGES.filter(page => {
+    return page.name.toLowerCase().includes(query.toLowerCase())
+  })
 
   const handleSelect = (path: string) => {
     navigate(path)

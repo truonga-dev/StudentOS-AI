@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 import type { CreateNoteInput } from '@/types'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const BORDER_COLORS = [
   'border-l-[#6366f1]', 'border-l-[#06b6d4]', 'border-l-[#22c55e]',
@@ -102,6 +103,7 @@ export function NotesPage() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const editorRef = useRef<HTMLDivElement>(null)
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null)
 
   // AI States
   const [aiLoading, setAiLoading] = useState(false)
@@ -249,8 +251,13 @@ export function NotesPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Xóa ghi chú này?')) return
+  const handleDelete = (id: string) => {
+    setNoteToDelete(id)
+  }
+
+  const confirmDeleteNote = async () => {
+    if (!noteToDelete) return
+    const id = noteToDelete
     try {
       await removeNote(id)
       if (selectedId === id) {
@@ -260,6 +267,8 @@ export function NotesPage() {
       toast.success('Đã xóa ghi chú')
     } catch (err: any) {
       toast.error('Lỗi khi xóa ghi chú')
+    } finally {
+      setNoteToDelete(null)
     }
   }
 
@@ -1038,6 +1047,18 @@ export function NotesPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Note Modal */}
+      <ConfirmModal
+        isOpen={Boolean(noteToDelete)}
+        onClose={() => setNoteToDelete(null)}
+        onConfirm={confirmDeleteNote}
+        title="Xóa ghi chú này?"
+        message="Nội dung ghi chú sẽ bị xóa vĩnh viễn và không thể khôi phục."
+        confirmText="Xóa ghi chú"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

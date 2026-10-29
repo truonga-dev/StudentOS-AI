@@ -11,3 +11,5 @@ google-generativeai==0.8.3
 groq
 slowapi
 fastapi-cache2
+redis
+sentry-sdk[fastapi]

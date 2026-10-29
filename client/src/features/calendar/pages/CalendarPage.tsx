@@ -5,6 +5,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTasks } from '@/hooks/useTasks'
 import { useCalendarEvents } from '@/hooks/useCalendarEvents'
 import { useSubjects } from '@/hooks/useSubjects'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 const MONTHS = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12']
@@ -28,6 +29,7 @@ export function CalendarPage() {
   const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
   const [showEventModal, setShowEventModal] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
 
@@ -486,7 +488,7 @@ export function CalendarPage() {
                         style={{ borderLeftColor: event.color || '#6366f1' }}
                       >
                         <button
-                          onClick={() => confirm('Xóa sự kiện này?') && removeEvent(event.id)}
+                          onClick={() => setEventToDelete(event.id)}
                           className="absolute right-2 top-2 p-1.5 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -674,6 +676,23 @@ export function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Event Modal */}
+      <ConfirmModal
+        isOpen={Boolean(eventToDelete)}
+        onClose={() => setEventToDelete(null)}
+        onConfirm={async () => {
+          if (eventToDelete) {
+            await removeEvent(eventToDelete)
+            setEventToDelete(null)
+          }
+        }}
+        title="Xóa sự kiện này?"
+        message="Sự kiện này sẽ bị gỡ bỏ khỏi lịch học của bạn."
+        confirmText="Xóa sự kiện"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

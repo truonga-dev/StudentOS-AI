@@ -20,6 +20,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.chat': 'AI Chat',
     'nav.community': 'Cộng đồng',
     'nav.analytics': 'Thống kê',
+    'nav.admin': 'Quản trị (Admin)',
     'nav.settings': 'Cài đặt & Hồ sơ',
     
     'settings.title': 'Cài đặt',
@@ -40,6 +41,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.chat': 'AI Chat',
     'nav.community': 'Community',
     'nav.analytics': 'Analytics',
+    'nav.admin': 'Admin Portal',
     'nav.settings': 'Settings & Profile',
 
     'settings.title': 'Settings',

@@ -1,9 +1,18 @@
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/types'
 
+export const SUPER_ADMIN_EMAIL = 'truonga01.dev@gmail.com'
+
+export function isAdminProfile(profile?: Profile | null, email?: string | null): boolean {
+  const checkEmail = (email || profile?.email || '').toLowerCase().trim()
+  return profile?.role === 'admin' || checkEmail === SUPER_ADMIN_EMAIL
+}
+
 export async function getProfile(): Promise<Profile> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  const isSuperAdmin = (user.email || '').toLowerCase().trim() === SUPER_ADMIN_EMAIL
 
   const { data, error } = await supabase
     .from('profiles')
@@ -26,10 +35,19 @@ export async function getProfile(): Promise<Profile> {
       .single()
       
     if (insertError) throw insertError
-    return newProfile as Profile
+    const created = newProfile as Profile
+    if (isSuperAdmin) created.role = 'admin'
+    return created
+  }
+
+  const profileData = data as Profile
+  if (isSuperAdmin && profileData.role !== 'admin') {
+    profileData.role = 'admin'
+    // Đồng bộ ngầm lên Supabase nếu cột role đã tồn tại
+    supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id).then(() => {})
   }
   
-  return data as Profile
+  return profileData
 }
 
 export async function getTopProfiles(limit: number = 50): Promise<Profile[]> {

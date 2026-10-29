@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Upload, Loader2, Trash2 } from 'lucide-react'
 import { updateChannel, deleteChannel, uploadChatAttachment } from '@/services/community'
 import toast from 'react-hot-toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface CommunitySettingsModalProps {
   channel: any
@@ -15,6 +16,7 @@ export function CommunitySettingsModal({ channel, onClose, onSuccess }: Communit
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(channel.logo_url || null)
   const [submitting, setSubmitting] = useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,13 +52,16 @@ export function CommunitySettingsModal({ channel, onClose, onSuccess }: Communit
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Bạn có chắc chắn muốn xóa cộng đồng này vĩnh viễn? Mọi dữ liệu sẽ bị xóa và không thể khôi phục.')) return
-    
+  const handleDelete = () => {
+    setShowConfirmDelete(true)
+  }
+
+  const confirmDelete = async () => {
     setSubmitting(true)
     try {
       await deleteChannel(channel.id)
       toast.success('Đã xóa cộng đồng')
+      setShowConfirmDelete(false)
       onSuccess()
     } catch (error: any) {
       toast.error(error.message || 'Lỗi xóa cộng đồng')
@@ -150,6 +155,19 @@ export function CommunitySettingsModal({ channel, onClose, onSuccess }: Communit
           </div>
         </form>
       </div>
+
+      {/* Confirm Delete Channel Modal */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={confirmDelete}
+        loading={submitting}
+        title="Xóa cộng đồng này?"
+        message="Mọi tin nhắn, tài liệu và thành viên trong cộng đồng này sẽ bị xóa vĩnh viễn và không thể khôi phục."
+        confirmText="Xóa vĩnh viễn"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

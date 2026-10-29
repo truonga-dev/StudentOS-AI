@@ -9,6 +9,7 @@ import { useFiles } from '@/hooks/useFiles'
 import { FileText, File as FileIcon, Presentation } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { FlashcardStudyMode, type StudyMode } from '../components/FlashcardStudyMode'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export function FlashcardsPage() {
   const { flashcards, loading, addFlashcard, addMultipleFlashcards, editFlashcard, removeFlashcard } = useFlashcards()
@@ -21,6 +22,7 @@ export function FlashcardsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [cardToDelete, setCardToDelete] = useState<string | null>(null)
   
   // AI Generate state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
@@ -248,9 +250,7 @@ export function FlashcardsPage() {
                     <span className="w-2 h-2 rounded-full bg-success-500" title="Đã thuộc" />
                   )}
                   <button
-                    onClick={() => {
-                      if(confirm('Xóa thẻ này?')) removeFlashcard(card.id)
-                    }}
+                    onClick={() => setCardToDelete(card.id)}
                     className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-surface-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-500/10 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -636,6 +636,23 @@ export function FlashcardsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Flashcard */}
+      <ConfirmModal
+        isOpen={Boolean(cardToDelete)}
+        onClose={() => setCardToDelete(null)}
+        onConfirm={() => {
+          if (cardToDelete) {
+            removeFlashcard(cardToDelete)
+            setCardToDelete(null)
+          }
+        }}
+        title="Xóa thẻ ghi nhớ này?"
+        message="Thẻ ghi nhớ và tiến độ ôn tập của thẻ này sẽ bị xóa khỏi bộ thẻ."
+        confirmText="Xóa thẻ"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

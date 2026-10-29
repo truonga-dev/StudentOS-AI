@@ -4,6 +4,7 @@ import { clsx } from 'clsx'
 import { useSubjects } from '@/hooks/useSubjects'
 import toast from 'react-hot-toast'
 import type { CreateSubjectInput, Subject } from '@/types'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 // Bảng màu cho subject cards
 const COLOR_OPTIONS = [
@@ -24,6 +25,7 @@ export function SubjectsPage() {
     title: '', color: '#6366f1', credits: 3, semester: '1',
   })
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [subjectToDelete, setSubjectToDelete] = useState<string | null>(null)
 
   const filtered = subjects.filter(s =>
     s.title.toLowerCase().includes(search.toLowerCase())
@@ -44,9 +46,8 @@ export function SubjectsPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Xóa môn học này? Các task và ghi chú liên quan sẽ bị tách rời.')) return
-    await removeSubject(id)
+  const handleDelete = (id: string) => {
+    setSubjectToDelete(id)
     setOpenMenuId(null)
   }
 
@@ -277,6 +278,23 @@ export function SubjectsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Subject */}
+      <ConfirmModal
+        isOpen={Boolean(subjectToDelete)}
+        onClose={() => setSubjectToDelete(null)}
+        onConfirm={async () => {
+          if (subjectToDelete) {
+            await removeSubject(subjectToDelete)
+            setSubjectToDelete(null)
+          }
+        }}
+        title="Xóa môn học này?"
+        message="Các task, flashcard và ghi chú liên quan tới môn học này sẽ bị tách rời. Bạn có chắc chắn muốn xóa không?"
+        confirmText="Xóa môn học"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

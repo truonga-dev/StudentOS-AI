@@ -6,6 +6,8 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   created_at: string
+  role?: 'user' | 'admin'
+  is_banned?: boolean
   points: number
   current_streak: number
   last_study_date: string | null
@@ -238,6 +240,9 @@ export interface Report {
   reason: string
   status: 'pending' | 'resolved' | 'dismissed'
   created_at: string
+  reporter?: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
+  reported_user?: { id: string; email: string; full_name: string | null; avatar_url: string | null; is_banned?: boolean } | null
+  message?: { id: string; content: string; channel_id: string; is_deleted?: boolean; created_at: string } | null
 }
 
 // ─── Flashcard ────────────────────────────────────────────────────────────────

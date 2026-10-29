@@ -6,6 +6,7 @@ import { useSubjects } from '@/hooks/useSubjects'
 import { getMimeIcon, formatFileSize, getSignedUrl } from '@/services/files'
 import { DocumentChat } from '../components/DocumentChat'
 import { DocumentUploader } from '../components/DocumentUploader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -102,6 +103,7 @@ export function FilesPage() {
   const { subjects } = useSubjects()
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [fileToDelete, setFileToDelete] = useState<{ id: string; storagePath: string } | null>(null)
 
   const handleFiles = useCallback(async (fileList: File[]) => {
     setUploadError(null)
@@ -118,10 +120,15 @@ export function FilesPage() {
     }
   }, [uploadFile, filterSubject])
 
-  const handleDelete = useCallback(async (id: string, storagePath: string) => {
-    if (!confirm('Xóa file này? Không thể hoàn tác!')) return
-    await deleteFile(id, storagePath)
-  }, [deleteFile])
+  const handleDelete = useCallback((id: string, storagePath: string) => {
+    setFileToDelete({ id, storagePath })
+  }, [])
+
+  const confirmDeleteFile = async () => {
+    if (!fileToDelete) return
+    await deleteFile(fileToDelete.id, fileToDelete.storagePath)
+    setFileToDelete(null)
+  }
 
   const filteredFiles = filterSubject
     ? files.filter(f => f.subject_id === filterSubject)
@@ -240,6 +247,18 @@ export function FilesPage() {
           <DocumentChat onClose={() => setIsChatOpen(false)} files={files} />
         </>
       )}
+
+      {/* Confirm Delete File Modal */}
+      <ConfirmModal
+        isOpen={Boolean(fileToDelete)}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmDeleteFile}
+        title="Xóa tệp tin này?"
+        message="Tệp tin sẽ bị xóa vĩnh viễn khỏi bộ nhớ và không thể khôi phục."
+        confirmText="Xóa tệp"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

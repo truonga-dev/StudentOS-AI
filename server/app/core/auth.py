@@ -79,3 +79,54 @@ def get_user_id(user: dict = Depends(get_current_user)) -> str:
     """Shortcut dependency: chỉ lấy user UUID."""
     return user["sub"]
 
+
+SUPER_ADMIN_EMAIL = "truonga01.dev@gmail.com"
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> str:
+    """Dependency: kiểm tra quyền Admin trong bảng profiles hoặc theo email Super Admin."""
+    from app.core.supabase_client import get_supabase
+
+    user_id = user["sub"]
+    user_email = (user.get("email") or "").lower().strip()
+
+    sb = get_supabase()
+    try:
+        res = sb.table("profiles").select("*").eq("id", user_id).maybe_single().execute()
+        data = res.data if res else None
+    except Exception:
+        data = None
+
+    is_super_email = (
+        user_email == SUPER_ADMIN_EMAIL
+        or (data and str(data.get("email") or "").lower().strip() == SUPER_ADMIN_EMAIL)
+    )
+
+    # Nếu là email truonga01.dev@gmail.com mà DB chưa set role='admin', tự động đồng bộ
+    if is_super_email and data and "role" in data and data.get("role") != "admin":
+        try:
+            sb.table("profiles").update({"role": "admin"}).eq("id", user_id).execute()
+        except Exception:
+            pass
+
+    if not is_super_email and (not data or data.get("role") != "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền truy cập trang Quản trị (Admin).",
+        )
+    if data and data.get("is_banned") and not is_super_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản của bạn đã bị khóa.",
+        )
+    return user_id
+
+
+def require_admin_info(
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Dependency: giống require_admin nhưng trả về {id, email} (dùng cho audit log)."""
+    admin_id = require_admin(user)
+    return {"id": admin_id, "email": (user.get("email") or "").lower().strip()}
+
+
