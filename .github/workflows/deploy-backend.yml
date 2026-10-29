@@ -19,8 +19,8 @@ jobs:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "Lỗi: Bạn chưa cài đặt biến bí mật RENDER_DEPLOY_HOOK trên GitHub."
-            exit 1
+            echo "::warning title=Render Deploy Hook::Chưa cài đặt biến bí mật RENDER_DEPLOY_HOOK trên GitHub Secrets. Bỏ qua bước tự động deploy."
+            exit 0
           fi
           echo "Đang kích hoạt Deploy trên Render..."
           curl -X POST "$RENDER_DEPLOY_HOOK"
